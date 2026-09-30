@@ -1,0 +1,20 @@
+citHeader("To cite cofechar in publications use:")
+
+bibentry(
+  bibtype  = "Manual",
+  title    = "cofechar: A faithful R port of COFECHA and EDT for reproducible quality control of tree-ring measurement series",
+  author   = person("Jonathan", "Barichivich"),
+  year     = "2026",
+  note     = "R package version 1.0.0.9000",
+  url      = "https://github.com/jbarichivich/cofechar",
+  textVersion = paste(
+    "Barichivich, J. (2026). cofechar: A faithful R port of COFECHA and EDT",
+    "for reproducible quality control of tree-ring measurement series.",
+    "R package version 1.0.0.9000. https://github.com/jbarichivich/cofechar"
+  )
+)
+
+citFooter(paste(
+  "cofechar reimplements the COFECHA and EDT programs of R. L. Holmes;",
+  "please also cite Holmes, R. L. (1983) Tree-Ring Bulletin 43:69-78."
+))

@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use cofechar, please cite it as below and also cite Holmes (1983)."
+type: software
+title: "cofechar: A faithful R port of COFECHA and EDT for reproducible quality control of tree-ring measurement series"
+version: 1.0.0.9000
+date-released: 2026-09-30
+license: GPL-3.0-or-later
+repository-code: "https://github.com/jbarichivich/cofechar"
+authors:
+  - family-names: Barichivich
+    given-names: Jonathan
+    affiliation: "Laboratoire des Sciences du Climat et de l'Environnement (LSCE), CNRS-CEA-UVSQ, Gif-sur-Yvette, France"
+keywords:
+  - dendrochronology
+  - crossdating
+  - COFECHA
+  - tree rings
+  - quality control
+references:
+  - type: article
+    authors:
+      - family-names: Holmes
+        given-names: Richard L.
+    title: "Computer-assisted quality control in tree-ring dating and measurement"
+    journal: "Tree-Ring Bulletin"
+    volume: 43
+    start: 69
+    end: 78
+    year: 1983
