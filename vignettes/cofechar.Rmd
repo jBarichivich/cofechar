@@ -1,0 +1,145 @@
+---
+title: "Getting started with cofechar"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with cofechar}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  eval      = FALSE   # examples require .rwl files not bundled with the package
+)
+```
+
+## Overview
+
+**cofechar** provides a faithful R port of two modules from Holmes'
+Dendrochronology Program Library (DPL):
+
+| Module | Functions | DPL routine |
+|--------|-----------|-------------|
+| EDT    | `dpl_read`, `dpl_write`, `dpl_read_dec`, `dpl_merge`, `dpl_edt`, `dpl_display`, `dpl_edit_file` | DPLEDT |
+| COF    | `dpl_cof`, `dpl_cof_diag`, `dpl_dateme`, `dpl_barplot`, `plot_cof_barplot` | DPLCOF / QCOF |
+
+All internal statistical routines — cubic smoothing spline, Burg AR modelling,
+log-transform, normalisation — are translated directly from Holmes' Fortran
+source (Holmes 1982–1994) so that numerical output is equivalent to the DPL
+reference implementation.
+
+---
+
+## Typical workflow
+
+### 1 — Read and inspect
+
+```{r read}
+library(cofechar)
+library(dplR)
+
+# Read the Cerro Mirador Fitzroya dataset (included in the package)
+mir_file <- system.file("extdata", "CL-MIR.rwl", package = "cofechar")
+rwl <- dpl_read_dec(mir_file, label_length = NULL, stop_val = -9999L,
+                    unit = "0.001mm")
+
+# Inspect a 50-year window around a suspect year
+dpl_display(rwl, series = "ACC014A", around_yr = 1950)
+```
+
+### 2 — Edit
+
+```{r edit}
+rwl_ed <- dpl_edt(
+  rwl,
+  edits = list(
+    # Replace a suspicious value in ACC014A (visible drought signal ~1953)
+    list(series = "ACC014A", op = "replace", year = 1953, value = 0.26),
+
+    # Trim the longest series to a common overlap start
+    list(series = "ACC026B", op = "trim_start", first_year = 1856),
+    list(series = "ACC026",  op = "trim_start", first_year = 1856),
+
+    # Drop a low-correlation core after reviewing COFECHA diagnostics
+    list(series = "ACC23TA", op = "omit")
+  )
+)
+```
+
+Available operations: `copy`, `omit`, `rename`, `first_year`, `last_year`,
+`replace`, `insert`, `delete`, `trim_start`, `trim_end`.
+
+### 3 — COFECHA quality control
+
+```{r cof}
+# Full run with default options — output mirrors DPL Parts 1–7
+cof <- dpl_cof(rwl_ed, output_file = tempfile(fileext = ".out"))
+
+# Inspect the statistics table (ranked by master correlation)
+cof$stats[order(cof$stats$r_master), ]
+
+# List all flagged segments
+subset(cof$segments, flag != "")
+
+# On-demand Part 6 diagnostics for the lowest-correlating series
+worst <- cof$stats$series[which.min(cof$stats$r_master)]
+dpl_cof_diag(cof, series = worst)
+```
+
+### 4 — Iterate
+
+```{r iterate}
+# After reviewing diagnostics, remove another problematic series and re-run
+drop <- cof$stats$series[cof$stats$r_master < cof$crit]
+rwl_ed2 <- dpl_edt(rwl_ed,
+  edits   = lapply(drop, function(id) list(series = id, op = "omit")),
+  verbose = FALSE)
+cof2 <- dpl_cof(rwl_ed2, verbose = FALSE)
+range(cof2$stats$r_master)
+```
+
+### 5 — Plot and export
+
+```{r plot}
+# ASCII bar plot of the COFECHA master (matches DPL Part 4)
+dpl_barplot(cof)
+
+# ASCII bar plot of a single series
+dpl_barplot(rwl, series = "ACC026B", years = c(1850, 2002))
+
+# Publication-quality graphical bar plot
+pdf(tempfile(fileext = ".pdf"), width = 14, height = 4)
+plot_cof_barplot(cof,
+  main = "Fitzroya cupressoides — Cerro Mirador (Barichivich 2005)")
+dev.off()
+```
+
+### 6 — Feed into dplR
+
+All functions return standard dplR `rwl` data.frames:
+
+```{r dplr}
+crn <- dplR::chron(dplR::detrend(rwl_ed, method = "Spline"))
+# rwl_ed is a standard dplR rwl — all dplR functions apply directly
+```
+
+---
+
+## Dating undated series
+
+```{r dateme}
+dat <- dpl_dateme(rwl_undated, cof_result = cof)
+dat$summary   # best_adj = year offset supported by most segments
+```
+
+---
+
+## References
+
+Holmes, R. L. (1983). Computer-assisted quality control in tree-ring dating
+and measurement. *Tree-Ring Bulletin* 43:69–78.
+
+Holmes, R. L. (1994). *Dendrochronology Program Library*. Laboratory of
+Tree-Ring Research, University of Arizona, Tucson.

@@ -1,0 +1,33 @@
+Package: cofechar
+Type: Package
+Title: COFECHA and EDT — R Port of the DPL Dendrochronology Program Library
+Version: 1.0.0
+Date: 2026
+Authors@R: c(
+    person("Jonathan", "Barichivich", role = c("aut", "cre"),
+           email = "barichivich@lsce.ipsl.fr",
+           comment = "R translation and xDPL framework, CATES ERC / CNRS-LSCE"))
+Description: A faithful R port of two core modules from Holmes'
+    Dendrochronology Program Library (DPL): EDT (ring-measurement editing)
+    and COFECHA (quality control and crossdating). All internal statistical
+    routines — cubic smoothing spline, Burg autoregressive modelling,
+    log-transform, normalisation — are translated directly from the original
+    Fortran source (Holmes 1982–1994) to ensure numerical equivalence with
+    DPL reference output. A dplR integration layer makes all functions
+    interoperable with the standard R dendrochronology ecosystem: inputs and
+    outputs are dplR rwl data.frames compatible with detrend(), chron(),
+    rwl.stats(), and related functions.
+License: GPL (>= 3)
+Encoding: UTF-8
+Imports:
+    stats,
+    graphics
+Suggests:
+    dplR,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+RoxygenNote: 7.3.1
+URL: https://github.com/jbarichivich/cofechar
+BugReports: https://github.com/jbarichivich/cofechar/issues
