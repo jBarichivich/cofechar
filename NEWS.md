@@ -7,7 +7,8 @@
   times and the columns were not anchored on COFECHA's 400-year grid. Pages
   now follow the DPL BARPL layout exactly.
 * COFECHA Part 4 and `dpl_barplot` now reproduce the DPL bar plot line for
-  line: decade separator rows after every 10 years, no blank line after the
+  line: decade separator after every 10 years (printed as a blank line, as
+  in Part 3, where DPL prints a row of "----"), no blank line after the
   column header, page header repeated per 400-year page, no trailing footer
   in Part 4.
 * Decile cut-points used Rs `round()` (half-to-even) where Holmes' Fortran

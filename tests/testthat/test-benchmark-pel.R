@@ -44,10 +44,13 @@ test_that("PEL benchmark: Part 4 bar plot matches DPL line for line", {
   ours  <- extract_part(cof$output, 4L)
 
   # Page header line carries a timestamp in DPL and the run title here;
-  # the horizontal rule differs by Fortran's carriage-control column.
+  # the horizontal rule differs by Fortran's carriage-control column; and
+  # cofechar intentionally prints the decade separator as a blank line where
+  # DPL prints "  " + 8 x " ----" (matching Part 3 spacing).
   mask <- function(x) {
     x <- sub("^\\s*PART 4:.*$", "PART 4", x)
-    sub("^ ?-{131,132}$", "RULE", x)
+    x <- sub("^ ?-{131,132}$", "RULE", x)
+    sub("^   ----( {12}----){7}$", "", x)
   }
   expect_equal(length(ours), length(bench))
   expect_equal(mask(ours), mask(bench))
@@ -65,8 +68,11 @@ test_that("dpl_barplot(cof) reproduces Part 4 bars and prints each year once", {
   expect_equal(length(o), 161L)
   expect_false(any(duplicated(names(o))))
   expect_equal(o[names(bench)], bench)
-  # decade separators present, header not followed by a blank line
-  expect_true(any(grepl("^   ----            ----", out)))
+  # blank decade separators after rows 9/19/29/39 of the first page:
+  # header, 10 rows, blank, 10 rows, blank ...
+  hdr <- grep("^   Year Rel value", out)[1L]
+  expect_equal(out[hdr + c(11L, 22L, 33L, 44L)], rep("", 4L))
+  expect_false(out[hdr + 1L] == "")     # no blank line right after header
 })
 
 test_that(".cof_nint rounds half away from zero like Fortran NINT", {

@@ -1546,13 +1546,16 @@ dpl_edit_file <- function(path,
 #     * pages of 400 years anchored at (JYR/400)*400; 8 columns x 50 rows
 #     * row i (0..49) holds years IA+i, IA+50+i, ..., IA+350+i
 #     * column header directly followed by the first row (no blank line)
-#     * decade separator "  " + 8 x " ----" after rows 9, 19, 29, 39 (not 49)
+#     * decade separator after rows 9, 19, 29, 39 (not 49).  DPL prints
+#       "  " + 8 x " ----"; cofechar deliberately prints a blank line instead,
+#       matching the decade spacing used in Part 3 (the only intentional
+#       departure from the DPL Part 4 layout).
 #     * one blank line closing each page
 #     * page_hdr (character vector) repeated at the top of every page
 #   make_car(yr) must return a 16-char cell or 16 spaces outside the span.
 .cof_barpl_pages <- function(make_car, jyr, lyr, page_hdr) {
   col_hdr <- paste0("  ", paste(rep(" Year Rel value ", 8L), collapse = ""))
-  sep_row <- paste0("  ", paste(rep(" ----           ", 8L), collapse = ""))
+  sep_row <- ""   # DPL: "  " + 8 x " ----"; see header comment
   out <- character(0)
   IA  <- (jyr %/% 400L) * 400L
   if (IA > jyr) IA <- IA - 400L
@@ -2537,8 +2540,9 @@ dpl_edit_file <- function(path,
 #        capped '<'; positive → chr(64+LP) capped '>'.
 #        CAR cell (16 chars): I5 year + (LB-6) dashes + symbol.
 #   4. .cof_barpl_pages: IA=(JYR/400)*400; pages of 400 yr, 8 cols × 50 rows;
-#        column header, rows, ' ----' separators after rows 9/19/29/39,
-#        blank line closing the page; page header repeated per page.
+#        column header, rows, blank decade separator after rows 9/19/29/39
+#        (DPL prints ' ----' there), blank line closing the page; page
+#        header repeated per page.
 #
 # ARGUMENTS
 #   master   Named numeric vector. The master dating series (named by year).
