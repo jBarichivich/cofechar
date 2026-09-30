@@ -43,7 +43,10 @@ series span; \code{"period"} --- normalise within the display window only.}
 plotting. Default `TRUE`.}
 }
 \value{
-Invisibly returns a named list of character line vectors per series.
+Invisibly, a named list of character vectors holding the formatted
+  lines: one element per series for \code{layout = "page"}; a single
+  element \code{all} for \code{layout = "column"}, where series are tiled
+  side by side. Use \code{writeLines()} on an element to reprint it.
 }
 \description{
 Produces the COFECHA-style ASCII bar plot (Fortran BARPL) for any set of

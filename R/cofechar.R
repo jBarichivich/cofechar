@@ -1508,6 +1508,68 @@ dpl_edit_file <- function(path,
 .cof_f72 <- function(v)  sprintf("%7.2f", v)   # values > 1 — no leading zero issue
 
 
+# .cof_nint  --  Fortran NINT: round half AWAY from zero
+#   R's round() is IEC 60559 round-half-to-even, so round(80.5) == 80 while
+#   Fortran NINT(80.5) == 81.  BARPL's decile indices hit exact .5 for some
+#   series lengths (e.g. NY = 161 -> 161*11/22 = 80.5), so the two disagree.
+.cof_nint <- function(x) sign(x) * floor(abs(x) + 0.5)
+
+# .cof_barpl_cuts  --  the 10 decile cut-points of BARPL (Fortran RANKRI step)
+#   z_norm: normalised values.  Returns Z(1..10).
+.cof_barpl_cuts <- function(z_norm) {
+  NY  <- length(z_norm)
+  zs  <- sort(z_norm, decreasing = TRUE)
+  DEC <- NY / 11.0
+  Z   <- numeric(10L)
+  for (j in 1L:10L) {
+    j1   <- max(1L, min(NY, .cof_nint(DEC * (j - 0.5))))
+    j2   <- max(1L, min(NY, .cof_nint(DEC * (j + 0.5))))
+    Z[j] <- 0.5 * (zs[j1] + zs[j2])
+  }
+  Z
+}
+
+# .cof_barpl_car  --  one 16-char BARPL cell for a normalised value
+.cof_barpl_car <- function(yr, yn, Z) {
+  lb <- 16L
+  for (k in 1L:10L) if (yn < Z[k]) lb <- 16L - k
+  lb <- max(6L, min(16L, lb))
+  lp <- .cof_nint(yn * 4)
+  if (lp < 0) { lp <- 96 - lp; if (lp > 122) lp <- 60 }   # a-z, '<'
+  else        { lp <- lp + 64; if (lp > 90)  lp <- 62 }   # A-Z, '>'
+  formatC(paste0(formatC(yr, width = 5L), strrep("-", lb - 6L), intToUtf8(lp)),
+          width = 16L, flag = "-")
+}
+
+# .cof_barpl_pages  --  BARPL page layout, verified line-for-line against the
+#   DPL COFECHA 4.04P PEL benchmark (PELCOF.OUT):
+#     * pages of 400 years anchored at (JYR/400)*400; 8 columns x 50 rows
+#     * row i (0..49) holds years IA+i, IA+50+i, ..., IA+350+i
+#     * column header directly followed by the first row (no blank line)
+#     * decade separator "  " + 8 x " ----" after rows 9, 19, 29, 39 (not 49)
+#     * one blank line closing each page
+#     * page_hdr (character vector) repeated at the top of every page
+#   make_car(yr) must return a 16-char cell or 16 spaces outside the span.
+.cof_barpl_pages <- function(make_car, jyr, lyr, page_hdr) {
+  col_hdr <- paste0("  ", paste(rep(" Year Rel value ", 8L), collapse = ""))
+  sep_row <- paste0("  ", paste(rep(" ----           ", 8L), collapse = ""))
+  out <- character(0)
+  IA  <- (jyr %/% 400L) * 400L
+  if (IA > jyr) IA <- IA - 400L
+  repeat {
+    out <- c(out, page_hdr, col_hdr)
+    for (i in 0L:49L) {
+      cells <- vapply(0L:7L, function(jj) make_car(IA + i + jj * 50L), character(1))
+      out <- c(out, paste0("  ", paste(cells, collapse = "")))
+      if (i %% 10L == 9L && i < 49L) out <- c(out, sep_row)
+    }
+    out <- c(out, "")
+    IA <- IA + 400L
+    if (IA > lyr) break
+  }
+  sub("\\s+$", "", out)
+}
+
 # -----------------------------------------------------------------------------
 # .cof_normts  —  convert array to mean = 0, variance = 1  [NORMTS]
 # -----------------------------------------------------------------------------
@@ -2461,21 +2523,22 @@ dpl_edit_file <- function(path,
 #   rank; the terminal symbol encodes the standard-deviation class (A-Z for
 #   positive, a-z for negative, @ for zero).
 #
-#   Verified against PUE benchmark: all 67 bars match with zero mismatches.
+#   Verified line-for-line against the DPL COFECHA 4.04P PEL benchmark
+#   (PELCOF.OUT, 161 years, 2 pages) and the PUE benchmark (67 bars).
 #
-# ALGORITHM  (direct translation of Fortran BARPL)
+# ALGORITHM  (direct translation of Fortran BARPL; shared helpers)
 #   1. NORMTS(NY,Y,XM,SD,0) — normalise to mean=0, population SD (k=0).
-#   2. RANKRI descending → 10 decile cut-points:
+#   2. .cof_barpl_cuts: RANKRI descending → 10 decile cut-points
 #        Z(j) = 0.5*(sorted[J1]+sorted[J2])
-#        J1 = round(NY/11*(j-0.5)),  J2 = round(NY/11*(j+0.5))
-#   3. LB = 16; for k=1..10: if Y<Z(k) then LB=16-k;  LB=max(6,min(16,LB)).
-#   4. LP = round(norm_val*4): negative → chr(96-LP) capped @(60=<);
-#                              positive → chr(64+LP) capped >(62).
-#   5. CAR cell (16 chars): I5 year + (LB-6) dashes + symbol, left-justified.
-#   6. Page layout: IA=(JYR/400)*400; pages of 400yr; 8 cols×50 rows each.
-#      Output row: '  ' + 8×CAR.  Page header: 2 spaces + 8×' Year Rel value '.
-#      Blank line at MOD(I,10)==9 for visual grouping (every 10 years).
-#      Footer: blank line + strrep('-',132) + 'NY values in series'.
+#        J1 = NINT(NY/11*(j-0.5)),  J2 = NINT(NY/11*(j+0.5))
+#      NINT = round half away from zero (.cof_nint), NOT R's round().
+#   3. .cof_barpl_car: LB = 16; for k=1..10: if Y<Z(k) then LB=16-k;
+#        LB=max(6,min(16,LB)).  LP = NINT(Y*4): negative → chr(96-LP)
+#        capped '<'; positive → chr(64+LP) capped '>'.
+#        CAR cell (16 chars): I5 year + (LB-6) dashes + symbol.
+#   4. .cof_barpl_pages: IA=(JYR/400)*400; pages of 400 yr, 8 cols × 50 rows;
+#        column header, rows, ' ----' separators after rows 9/19/29/39,
+#        blank line closing the page; page header repeated per page.
 #
 # ARGUMENTS
 #   master   Named numeric vector. The master dating series (named by year).
@@ -2489,81 +2552,19 @@ dpl_edit_file <- function(path,
 #
 .cof_fmt_part4 <- function(master, title) {
   years <- as.integer(names(master))
-  jyr   <- min(years);  lyr <- max(years);  NY <- length(years)
+  jyr   <- min(years);  lyr <- max(years)
 
-  # Step 1: NORMTS(NY, Y, XM, SD, k=0) — population SD (Fortran line 2169)
-  nr <- .cof_normts(as.numeric(master), k = 0L)
-  Y  <- setNames(nr$z, names(master))
+  # NORMTS(NY, Y, XM, SD, k=0) -- population SD, as in Fortran BARPL
+  Y <- setNames(.cof_normts(as.numeric(master), k = 0L)$z, names(master))
+  Z <- .cof_barpl_cuts(Y)
 
-  # Step 2: sort descending, compute 10 decile cut-points (Fortran lines 2181-2186)
-  z_sorted <- sort(nr$z, decreasing = TRUE)
-  DEC <- NY / 11.0
-  Z   <- numeric(10L)
-  for (j in 1L:10L) {
-    j1   <- max(1L, min(NY, round(DEC * (j - 0.5))))
-    j2   <- max(1L, min(NY, round(DEC * (j + 0.5))))
-    Z[j] <- 0.5 * (z_sorted[j1] + z_sorted[j2])
-  }
-
-  # Helper: build one 16-char CAR cell for a given year (Fortran lines 2197-2221)
   make_car <- function(yr) {
     if (yr < jyr || yr > lyr) return(strrep(" ", 16L))
-    yn <- Y[as.character(yr)]
-
-    lb <- 16L
-    for (k in 1L:10L) if (!is.na(yn) && yn < Z[k]) lb <- 16L - k
-    lb <- max(6L, min(16L, lb))
-
-    lp <- round(yn * 4)
-    if (lp < 0L) {
-      lp <- 96L - lp
-      if (lp > 122L) lp <- 60L   # '<'
-    } else {
-      lp <- lp + 64L
-      if (lp > 90L) lp <- 62L    # '>'
-    }
-    sym <- intToUtf8(lp)
-
-    bar <- paste0(formatC(yr, width = 5L), strrep("-", lb - 6L), sym)
-    formatC(bar, width = 16L, flag = "-")
+    .cof_barpl_car(yr, Y[[as.character(yr)]], Z)
   }
 
-  # IA formula (Fortran lines 2189-2190):
-  #   IA = (JYR/400)*400
-  #   IF (IA > JYR) IA = IA - 400
-  # Page covers 400 years, 8 columns × 50 rows.
-  # Page increment = 400 (Fortran line 2227).
-  IA <- (jyr %/% 400L) * 400L
-  if (IA > jyr) IA <- IA - 400L
-
-  # Decade separator line (Fortran lines 2224-2225):
-  out_lines <- c(
-    sprintf("PART 4:  Master Bar Plot: %s", title),
-    strrep("-", 132L),
-    # Fortran: WRITE(IU,'(2X,8('' Year Rel value '')/)')
-    sprintf("  %s", paste(rep(" Year Rel value ", 8L), collapse = "")),
-    ""   # blank line from trailing '/' in format
-  )
-
-  repeat {
-    for (i in IA:(IA + 49L)) {
-      cells <- vapply(0L:7L, function(jj) make_car(i + jj * 50L), character(1))
-      out_lines <- c(out_lines, paste0("  ", paste(cells, collapse = "")))
-      # Fortran line 2224-2225: MOD(I,10)==9 emits a '+' overprint row that overwrites
-      # the PREVIOUS line on paper (carriage-return without line-feed). In plain-text
-      # file output these become spurious visible lines — suppress them.
-    }
-    IA <- IA + 400L        # page increment: 400 years (Fortran line 2227)
-    if (IA > lyr) break
-  }
-
-  # Fortran line 2229: WRITE(IU,'(/1X,131(''-'')/I8,'' values in series'')')NY
-  out_lines <- c(out_lines,
-    "",
-    paste0(" ", strrep("-", 131L)),
-    sprintf("%8d values in series", NY))
-
-  out_lines
+  page_hdr <- c(sprintf("PART 4:  Master Bar Plot: %s", title), strrep("-", 132L))
+  .cof_barpl_pages(make_car, jyr, lyr, page_hdr)
 }
 
 
@@ -4370,7 +4371,10 @@ dpl_dateme <- function(rwl_undated,
 #' @param normalise Logical. Normalise to mean = 0, population SD = 1 before
 #'   plotting. Default `TRUE`.
 #'
-#' @return Invisibly returns a named list of character line vectors per series.
+#' @return Invisibly, a named list of character vectors holding the formatted
+#'   lines: one element per series for \code{layout = "page"}; a single
+#'   element \code{all} for \code{layout = "column"}, where series are tiled
+#'   side by side. Use \code{writeLines()} on an element to reprint it.
 #'
 #' @examples
 #' \dontrun{
@@ -4492,42 +4496,23 @@ dpl_barplot <- function(rwl,
       y_dec  <- as.numeric(v_norm)
     }
 
-    # Decile cut-points from the norm-scope values (Fortran RANKRI algorithm)
-    NY_norm  <- length(y_dec)
-    z_sorted <- sort(y_dec, decreasing = TRUE)
-    DEC <- NY_norm / 11.0
-    Z   <- numeric(10L)
-    for (j in 1L:10L) {
-      j1   <- max(1L, min(NY_norm, round(DEC * (j - 0.5))))
-      j2   <- max(1L, min(NY_norm, round(DEC * (j + 0.5))))
-      Z[j] <- 0.5 * (z_sorted[j1] + z_sorted[j2])
-    }
+    # Decile cut-points from the norm-scope values (Fortran RANKRI / NINT)
+    Z <- .cof_barpl_cuts(as.numeric(y_dec))
 
     # Display window for this series
     disp_jyr <- if (!is.null(years)) max(years[1L], min(yrs_full)) else min(yrs_full)
     disp_lyr <- if (!is.null(years)) min(years[2L], max(yrs_full)) else max(yrs_full)
 
-    # make_car: 16-char cell (Fortran BARPL convention)
+    # make_car: 16-char cell (Fortran BARPL convention, shared helper);
+    # blank outside the display window and for NA values
     make_car_fn <- local({
-      Y_   <- Y_full
-      Z_   <- Z
+      Y_ <- Y_full;  Z_ <- Z
+      dj <- as.integer(disp_jyr);  dl <- as.integer(disp_lyr)
       function(yr) {
-        yr_ch <- as.character(yr)
-        if (!(yr_ch %in% names(Y_))) return(strrep(" ", 16L))
-        yn <- Y_[yr_ch]
-        if (is.na(yn)) return(strrep(" ", 16L))
-        lb <- 16L
-        for (k in 1L:10L) if (yn < Z_[k]) lb <- 16L - k
-        lb <- max(6L, min(16L, lb))
-        lp <- round(yn * 4)
-        if (lp < 0L) {
-          lp <- 96L - lp;  if (lp > 122L) lp <- 60L
-        } else {
-          lp <- lp + 64L;  if (lp > 90L)  lp <- 62L
-        }
-        bar <- paste0(formatC(yr, width = 5L), strrep("-", lb - 6L),
-                      intToUtf8(lp))
-        formatC(bar, width = 16L, flag = "-")
+        if (yr < dj || yr > dl) return(strrep(" ", 16L))
+        yn <- Y_[as.character(yr)]
+        if (length(yn) == 0L || is.na(yn)) return(strrep(" ", 16L))
+        .cof_barpl_car(yr, as.numeric(yn), Z_)
       }
     })
 
@@ -4561,7 +4546,8 @@ dpl_barplot <- function(rwl,
 
   # ---- 4. Assemble output lines per layout ----------------------------------
 
-  out_lines <- character(0)
+  out_lines  <- character(0)
+  per_series <- list()
 
   if (layout == "page") {
     # PAGE layout: one series per block, 8 columns x 50 rows -----------------
@@ -4570,31 +4556,20 @@ dpl_barplot <- function(rwl,
       make_c  <- s$make_car
       djyr    <- s$disp_jyr;  dlyr <- s$disp_lyr
 
-      hdr <- c(
+      page_hdr <- c(
         "",
         strrep("=", 132L),
         sprintf(" Series: %-8s   %d to %d   (%d yr)%s%s",
                 sid, s$full_jyr, s$full_lyr, s$full_n,
                 s$norm_note, s$disp_note),
-        strrep("-", 132L),
-        sprintf("  %s", paste(rep(" Year Rel value ", 8L), collapse = "")),
-        ""
+        strrep("-", 132L)
       )
-      body <- character(0)
-      IA <- (djyr %/% 100L) * 100L
-      repeat {
-        for (i in IA:(IA + 49L)) {
-          cells   <- vapply(0L:7L, function(jj) make_c(i + jj * 50L), character(1))
-          body <- c(body, paste0("  ", paste(cells, collapse = "")))
-          if (i %% 10L == 9L && i < IA + 49L) body <- c(body, "")
-        }
-        IA <- IA + 100L
-        if (IA > dlyr) break
-        body <- c(body, "")
-      }
-      footer <- c("", paste0(" ", strrep("-", 131L)),
+      # Same 400-year page engine as COFECHA Part 4 (see .cof_barpl_pages)
+      body   <- .cof_barpl_pages(make_c, djyr, dlyr, page_hdr)
+      footer <- c(paste0(" ", strrep("-", 131L)),
                   sprintf("%8d years displayed", dlyr - djyr + 1L))
-      out_lines <- c(out_lines, hdr, body, footer)
+      per_series[[sid]] <- c(body, footer)
+      out_lines <- c(out_lines, body, footer)
     }
 
   } else {
@@ -4660,7 +4635,7 @@ dpl_barplot <- function(rwl,
         "",
         strrep("=", 132L),
         if (n_pages > 1L)
-          sprintf(" Column layout — page %d of %d  (years %d to %d)",
+          sprintf(" Column layout -- page %d of %d  (years %d to %d)",
                   pg, n_pages, g_jyr, g_lyr)
         else
           sprintf(" Column layout  (years %d to %d)", g_jyr, g_lyr),
@@ -4720,7 +4695,9 @@ dpl_barplot <- function(rwl,
       message(sprintf("ASCII bar plot written to: %s", output_file))
   }
 
-  invisible(all_lines)
+  # Page layout: one element per series.  Column layout tiles series side by
+  # side, so the lines cannot be split per series: return them under "all".
+  if (layout == "page") invisible(per_series) else invisible(list(all = flat))
 }
 
 
