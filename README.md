@@ -44,6 +44,9 @@ altered tree growth and physiology in the Earth System*, grant agreement
 no. [101043214](https://cordis.europa.eu/project/id/101043214)), hosted by CNRS
 at the Laboratoire des Sciences du Climat et de l'Environnement (LSCE).
 
+`cofechar` is part of **xDPL**, the CATES suite of open-source tools for
+modern, reproducible and scriptable tree-ring research workflows.
+
 ## Citation
 
 Run `citation("cofechar")` in R, or use the "Cite this repository" button on
