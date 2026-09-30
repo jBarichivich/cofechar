@@ -30,3 +30,19 @@ subset(cof$segments, flag != "")
 
 Holmes, R. L. (1983). Computer-assisted quality control in tree-ring dating
 and measurement. *Tree-Ring Bulletin* 43:69--78.
+
+## Licence and funding
+
+cofechar is released under the GNU General Public License v3 (or later).
+
+Development was funded by the European Research Council (ERC) under the
+European Union's Horizon Europe programme, Starting Grant **CATES**
+(*Long-term consequences of altered tree growth and physiology in the Earth
+System*, grant agreement no. 101043214), hosted by CNRS at the Laboratoire des
+Sciences du Climat et de l'Environnement (LSCE).
+
+## Citation
+
+Run `citation("cofechar")` in R, or use the "Cite this repository" button on
+GitHub. Please also cite Holmes, R. L. (1983), Tree-Ring Bulletin 43:69--78,
+whose COFECHA program this package reimplements.

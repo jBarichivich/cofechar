@@ -31,3 +31,4 @@ VignetteBuilder: knitr
 RoxygenNote: 7.3.1
 URL: https://github.com/jbarichivich/cofechar
 BugReports: https://github.com/jbarichivich/cofechar/issues
+Config/funding: European Research Council (ERC) Starting Grant CATES, grant agreement no. 101043214 (HORIZON-ERC), hosted by CNRS at LSCE
