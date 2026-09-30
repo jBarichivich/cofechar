@@ -39,8 +39,8 @@ cofechar was developed by Prof. Jonathan Barichivich (CNRS-LSCE). Development
 was funded by the European Research Council (ERC) under the European Union's
 Horizon Europe programme, Starting Grant **CATES** (*Long-term consequences of
 altered tree growth and physiology in the Earth System*, grant agreement
-no. 101043214), hosted by CNRS at the Laboratoire des Sciences du Climat et de
-l'Environnement (LSCE).
+no. [101043214](https://cordis.europa.eu/project/id/101043214)), hosted by CNRS
+at the Laboratoire des Sciences du Climat et de l'Environnement (LSCE).
 
 ## Citation
 
