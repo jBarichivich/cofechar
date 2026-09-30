@@ -1,3 +1,8 @@
+
+# cofechar 1.0.0.9000 (development)
+
+* Development version following the 1.0.0 faithful-port release.
+
 # cofechar 1.0.0
 
 First release: a faithful R port of Holmes' COFECHA and EDT modules from the
