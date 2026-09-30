@@ -33,9 +33,9 @@ and measurement. *Tree-Ring Bulletin* 43:69--78.
 
 ## Licence and funding
 
-cofechar is released under the GNU General Public License v3 (or later).
+`cofechar` is released under the GNU General Public License v3 (or later).
 
-cofechar was developed by Prof. Jonathan Barichivich (CNRS-LSCE). Development
+`cofechar` was developed by Prof. Jonathan Barichivich (CNRS-LSCE). Development
 was funded by the European Research Council (ERC) under the European Union's
 Horizon Europe programme, Starting Grant **CATES** (*Long-term consequences of
 altered tree growth and physiology in the Earth System*, grant agreement
