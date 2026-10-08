@@ -104,3 +104,20 @@ test_that("dpl_short pool = TRUE tests the stand mean and labels 3-year series u
   # pooled years cover 1976..1980 differences (>= 2 series)
   expect_equal(range(as.integer(names(chk$pool$series))), c(2006L, 2010L))
 })
+
+test_that("dpl_cof runs when the last series in the collection are set aside", {
+  set.seed(4)
+  sig <- cumsum(rnorm(60)); sig <- abs(sig / max(abs(sig)) * 2) + 0.5
+  rwl <- mk_rwl(1950:2009,
+                A = ser(sig * exp(rnorm(60, sd = 0.15))),
+                B = ser(sig * exp(rnorm(60, sd = 0.15))),
+                C = ser(sig * exp(rnorm(60, sd = 0.15))),
+                S1 = ser(sig[53:60], offset = 52L),     # 8 yr, last columns
+                S2 = ser(sig[55:60], offset = 54L))     # 6 yr
+  # min_length larger than the short series, Part 5 and 6 requested
+  cof <- dpl_cof(rwl, verbose = FALSE, min_length = 15L)
+  expect_setequal(cof$short$series, c("S1", "S2"))
+  expect_equal(nrow(cof$stats), 3L)
+  expect_true(any(grepl("^PART 5", cof$output)))
+  expect_true(any(grepl("^PART 7", cof$output)))
+})

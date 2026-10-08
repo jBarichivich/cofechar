@@ -3685,8 +3685,11 @@ dpl_cof <- function(rwl,
 
   # ---- Part 5: build full table then emit ----------------------------------
   # Collect all per-series rows first (needed for column header and avg row)
-  p5_rows    <- list()   # list of .cof_fmt_seg_table() results
-  p5_all_segs <- list()  # all segment results for all series (for avg)
+  # Pre-sized so that series skipped in the first loop (empty, or shorter
+  # than min_length) leave NULL slots; indexing p5_rows[[seq_no]] past the
+  # last stored series would otherwise be out of bounds.
+  p5_rows     <- vector("list", nser_tot)   # .cof_fmt_seg_table() results
+  p5_all_segs <- vector("list", nser_tot)   # all segment results (for avg)
 
   for (seq_no in seq_len(nser_tot)) {
     s <- ser_store[[seq_no]]

@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9002 (development)
+# cofechar 1.0.0.9003 (development)
 
 ## New features
 
@@ -22,6 +22,9 @@
 
 ## Bug fixes
 
+* `dpl_cof()` failed with "subscript out of bounds" in Part 5 when the
+  last series of the collection were set aside (empty or shorter than
+  `min_length`); the Part 5 row list was not pre-sized.
 * `.cof_spline()` crashed with "subscript out of bounds" on series of
   exactly 4 years (R's `a:b` counts backwards where a Fortran DO loop would
   not execute).
