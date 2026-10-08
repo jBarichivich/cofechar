@@ -75,3 +75,32 @@ test_that("dpl_short finds lag 0 for a correctly dated short series and the shif
   # p-values only from min_n differences
   expect_true(all(is.na(chk$lags$p[chk$lags$n < 5])))
 })
+
+test_that("dpl_short pool = TRUE tests the stand mean and labels 3-year series untestable", {
+  set.seed(3)
+  sig <- cumsum(rnorm(80)); sig <- abs(sig / max(abs(sig)) * 2) + 0.5
+  mk <- function(from, to) ser(sig[from:to] * exp(rnorm(to - from + 1, sd = 0.10)),
+                                offset = from - 1L)
+  rwl <- mk_rwl(1931:2010,
+                A = ser(sig * exp(rnorm(80, sd = 0.15))),
+                B = ser(sig * exp(rnorm(80, sd = 0.15))),
+                C = ser(sig * exp(rnorm(80, sd = 0.15))),
+                D = ser(sig * exp(rnorm(80, sd = 0.15))),
+                s1 = mk(76, 80), s2 = mk(75, 80), s3 = mk(74, 80),   # 5-7 yr
+                s4 = mk(77, 80), s5 = mk(78, 80))                     # 4, 3 yr
+  cof <- dpl_cof(rwl, verbose = FALSE, parts = integer(0))
+  expect_setequal(cof$short$series, paste0("s", 1:5))
+  chk <- dpl_short(rwl, cof, pool = TRUE, pool_min = 2L)
+  s <- chk$summary
+  expect_equal(s$series[1L], "POOL")
+  expect_equal(s$best_lag[s$series == "POOL"], 0L)
+  expect_equal(s$verdict[s$series == "POOL"], "ok")
+  # the pool is testable although its members are not
+  expect_false(is.na(s$p0[s$series == "POOL"]))
+  expect_equal(s$verdict[s$series == "s5"], "untestable")
+  expect_true(is.na(s$p0[s$series == "s4"]))          # 4 yr: no p-value
+  expect_true(!is.null(chk$pool))
+  expect_true(all(chk$pool$depth >= 2L))
+  # pooled years cover 1976..1980 differences (>= 2 series)
+  expect_equal(range(as.integer(names(chk$pool$series))), c(2006L, 2010L))
+})

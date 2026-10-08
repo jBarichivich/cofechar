@@ -7,7 +7,11 @@
   sliding segments (microcores, xylogenesis samples, short anatomical
   sequences). Tests lag 0 against +/- `max_lag` on first differences of the
   log series, reporting r, an exact p-value (n >= 5), Gleichlaeufigkeit with
-  its binomial p-value, and a verdict (ok / shifted / weak).
+  its binomial p-value, and a verdict (ok / shifted / weak / untestable).
+  `pool = TRUE` also tests the mean log-difference series of all short
+  series from the stand, which can be tested even when the individual
+  series are too short. The help page documents the workflow and the
+  number of years needed for each level of evidence.
 * `dpl_cof()` gains `min_length` (default 10): series with fewer measured
   years are excluded from the master and from segment testing, listed in
   Part 1 and returned in `$short`. COFECHA's CRIT99 table starts at 10 years;
