@@ -8,6 +8,7 @@ dpl_read_dec(
   file,
   label_length = NULL,
   stop_val = 999L,
+  na_val = c(-999L, -9999L),
   unit = c("auto", "0.001mm", "0.01mm", "mm"),
   skip_lines = 0L,
   base_century = 1900L
@@ -26,6 +27,13 @@ the label itself ends in four digits; leave `NULL` otherwise.}
 
 \item{stop_val}{Integer (default `999L`). End-of-series sentinel.
 Set `NULL` to import all values as-is.}
+
+\item{na_val}{Integer vector (default `c(-999L, -9999L)`). Values that mark
+a missing measurement \emph{within} a series (the year is kept, the value
+becomes `NA`); typical of files exported from measuring software for
+series with gaps, e.g. microcores not sampled in some years. Values equal
+to `stop_val` are always treated as end of series first. Set `NULL` to
+disable.}
 
 \item{unit}{Character: \code{"auto"} (default), \code{"0.001mm"}, \code{"0.01mm"}, or
 \code{"mm"}. Under \code{"auto"}, two signals are combined: a negative `stop_val`

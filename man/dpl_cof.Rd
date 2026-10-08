@@ -15,6 +15,7 @@ dpl_cof(
   outp = 3,
   outn = -4.5,
   parts = 1:7,
+  min_length = 10L,
   output_file = NULL,
   verbose = TRUE
 )
@@ -53,6 +54,12 @@ Holmes default: `-4.5`.}
 appear in `$output` and `output_file`. Defaults to all parts. Part 6
 diagnostics are always computed and stored in `$problems` regardless.}
 
+\item{min_length}{Integer (default `10L`). Series with fewer measured years
+are excluded from the master and from segment testing, listed in Part 1
+and returned in `$short`. COFECHA's critical-correlation table starts at
+10 years; shorter series cannot be tested meaningfully with sliding
+segments. Use \code{\link{dpl_short}} to check them against the master.}
+
 \item{output_file}{Character or `NULL`. If supplied, writes the full
 formatted COFECHA output to that file.}
 
@@ -62,6 +69,8 @@ formatted COFECHA output to that file.}
 \value{
 A named list:
 \describe{
+  \item{`$short`}{`data.frame` (`series`, `jyr`, `lyr`, `n`) of series
+    excluded as shorter than `min_length` (empty if none).}
   \item{`$master`}{Named numeric vector. Globally normalised master dating
     series (names = character years). Used for Part 3/4 output and plotting.}
   \item{`$master_raw`}{Named numeric vector. Pre-normalisation mean of

@@ -650,6 +650,12 @@ dpl_write <- function(x, path, format = "compact") {
 #'   the label itself ends in four digits; leave `NULL` otherwise.
 #' @param stop_val Integer (default `999L`). End-of-series sentinel.
 #'   Set `NULL` to import all values as-is.
+#' @param na_val Integer vector (default `c(-999L, -9999L)`). Values that mark
+#'   a missing measurement \emph{within} a series (the year is kept, the value
+#'   becomes `NA`); typical of files exported from measuring software for
+#'   series with gaps, e.g. microcores not sampled in some years. Values equal
+#'   to `stop_val` are always treated as end of series first. Set `NULL` to
+#'   disable.
 #' @param unit Character: \code{"auto"} (default), \code{"0.001mm"}, \code{"0.01mm"}, or
 #'   \code{"mm"}. Under \code{"auto"}, two signals are combined: a negative `stop_val`
 #'   (e.g. `-9999`) with median raw value > 20 implies 1/1000 mm (scale
@@ -690,6 +696,7 @@ dpl_write <- function(x, path, format = "compact") {
 dpl_read_dec <- function(file,
                            label_length = NULL,
                            stop_val     = 999L,
+                           na_val       = c(-999L, -9999L),
                            unit         = c("auto", "0.001mm", "0.01mm", "mm"),
                            skip_lines   = 0L,
                            base_century = 1900L) {
@@ -803,6 +810,7 @@ dpl_read_dec <- function(file,
       if (is.na(v_int)) next
       yr <- decade_yr + (i - 1L)
       if (!is.null(stop_val) && v_int == as.integer(stop_val)) break
+      if (!is.null(na_val) && v_int %in% as.integer(na_val)) v_int <- NA_integer_
       data_store[[sid]][as.character(yr)] <- v_int
     }
   }
@@ -3082,11 +3090,18 @@ dpl_edit_file <- function(path,
 #'   diagnostics are always computed and stored in `$problems` regardless.
 #' @param output_file Character or `NULL`. If supplied, writes the full
 #'   formatted COFECHA output to that file.
+#' @param min_length Integer (default `10L`). Series with fewer measured years
+#'   are excluded from the master and from segment testing, listed in Part 1
+#'   and returned in `$short`. COFECHA's critical-correlation table starts at
+#'   10 years; shorter series cannot be tested meaningfully with sliding
+#'   segments. Use \code{\link{dpl_short}} to check them against the master.
 #' @param verbose Logical. Print per-series progress and summary box. Default
 #'   `TRUE`.
 #'
 #' @return A named list:
 #' \describe{
+#'   \item{`$short`}{`data.frame` (`series`, `jyr`, `lyr`, `n`) of series
+#'     excluded as shorter than `min_length` (empty if none).}
 #'   \item{`$master`}{Named numeric vector. Globally normalised master dating
 #'     series (names = character years). Used for Part 3/4 output and plotting.}
 #'   \item{`$master_raw`}{Named numeric vector. Pre-normalisation mean of
@@ -3160,11 +3175,13 @@ dpl_cof <- function(rwl,
                      outp          =  3.0,
                      outn          = -4.5,
                      parts         = 1:7,
+                     min_length    = 10L,
                      output_file   = NULL,
                      verbose       = TRUE) {
 
   # ---- Input validation ----------------------------------------------------
   if (!.is_rwl(rwl)) stop("'rwl' must be a dplR rwl data.frame.")
+  min_length <- max(1L, as.integer(min_length))
   if (ncol(rwl) < 2L)
     stop("'rwl' must contain at least two series for a meaningful master.")
   seg_lag <- min(seg_lag, seg_length %/% 2L)
@@ -3195,11 +3212,29 @@ dpl_cof <- function(rwl,
   # ---- FIRST LOOP: filter series, accumulate master -----------------------
   n_dated <- 0L
   nrtot   <- 0L    # total rings across all series
+  short_df <- data.frame(series = character(0), jyr = integer(0),
+                         lyr = integer(0), n = integer(0),
+                         stringsAsFactors = FALSE)
   for (seq_no in seq_len(nser_tot)) {
     id   <- ser_ids[seq_no]
     col  <- rwl[[id]]
     ok   <- which(!is.na(col))
     if (length(ok) == 0L) next
+
+    # Series shorter than min_length cannot be tested by segments (CRIT99 is
+    # tabulated from n = 10) and would only add noise to the master: exclude
+    # them from the run and report them in Part 1 and $short.
+    n_ok <- length(ok)
+    if (n_ok < min_length) {
+      short_df <- rbind(short_df, data.frame(
+        series = id, jyr = years_all[ok[1L]], lyr = years_all[ok[n_ok]],
+        n = n_ok, stringsAsFactors = FALSE))
+      if (verbose)
+        message(sprintf("%4d  %-8s  %d - %d  (%d yr)  -- too short (< %d), not used",
+                        seq_no, id, years_all[ok[1L]], years_all[ok[n_ok]],
+                        n_ok, min_length))
+      next
+    }
 
     jyr  <- years_all[ok[1L]]
     lyr  <- years_all[ok[length(ok)]]
@@ -3624,6 +3659,15 @@ dpl_cof <- function(rwl,
       p1 <- c(p1, "",
         sprintf("%14d absent rings%8.3f%%", total_ab, pct_ab))
     }
+    if (nrow(short_df) > 0L) {
+      p1 <- c(p1, "",
+        sprintf(" SERIES NOT USED: shorter than %d years (not included in master, not tested by segments)",
+                min_length), "")
+      for (k in seq_len(nrow(short_df)))
+        p1 <- c(p1, sprintf(" %-8s  %4d to %4d  %4d years",
+                            short_df$series[k], short_df$jyr[k],
+                            short_df$lyr[k], short_df$n[k]))
+    }
     out_lines <- c(out_lines, p1)
   }
 
@@ -3858,6 +3902,7 @@ dpl_cof <- function(rwl,
 
   # ---- Return --------------------------------------------------------------
   result <- list(
+    short        = short_df,      # series excluded as shorter than min_length
     master       = master_norm,   # globally normalised master (for plotting, Part 3/4)
     master_raw   = master,        # raw mean of z_norm per series (pre global normts)
     sample_depth = depth,
@@ -3874,7 +3919,8 @@ dpl_cof <- function(rwl,
       log_transform = log_transform,
       crit_level    = crit_level,
       outp          = outp,
-      outn          = outn
+      outn          = outn,
+      min_length    = min_length
     ),
     output       = out_lines
   )
