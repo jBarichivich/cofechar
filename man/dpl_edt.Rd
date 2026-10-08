@@ -7,6 +7,8 @@
 dpl_edt(
   x,
   edits = list(),
+  keep = NULL,
+  drop = NULL,
   default_action = "copy",
   as_rwl = TRUE,
   verbose = TRUE
@@ -21,9 +23,18 @@ list with at minimum `series` (character ID or integer 1-based index) and
 `op` (character; see **Operations**). Additional fields depend on `op`.
 An empty list passes all series through according to `default_action`.}
 
+\item{keep}{Series to keep, by ID or 1-based position in `x` (e.g.
+`c("ACC026", "ACC026B")` or `1:5`); all others are left out before any
+edit is applied. Input order is preserved. Cannot be combined with
+`drop`.}
+
+\item{drop}{Series to leave out, by ID or position; all others are kept.
+Cannot be combined with `keep`.}
+
 \item{default_action}{Character. \code{"copy"} (default) passes unmentioned series
-through; \code{"omit"} drops them --- useful for extracting a named subset without
-listing every series to keep.}
+through; \code{"omit"} drops them. This is the DPLEDT way of extracting a
+subset (one `copy` edit per series to keep); `keep` and `drop` do the
+same in one argument.}
 
 \item{as_rwl}{Logical. `TRUE` (default) returns a dplR `rwl` data.frame.
 `FALSE` returns the xDPL internal series list for passing to \code{\link{dpl_write}}.}
@@ -95,13 +106,12 @@ rwl_ed <- dpl_edt(rwl, edits = list(
   list(series = "ACC026C",  op = "trim_start", first_year = 1856)
 ))
 
-# Extract only the longest series (>= 300 years) without listing every drop
+# Extract a subset: by name, by position, or by exclusion
+rwl_sub  <- dpl_edt(rwl, keep = c("ACC026", "ACC026B", "ACC026C"))
+rwl_sub  <- dpl_edt(rwl, keep = 1:5)
+rwl_sub  <- dpl_edt(rwl, drop = "ACC23TA")
 long_ids <- colnames(rwl)[colSums(!is.na(rwl)) >= 300]
-rwl_long <- dpl_edt(rwl,
-  edits = lapply(long_ids, function(id) list(series = id, op = "copy")),
-  default_action = "omit"
-)
-ncol(rwl_long)
+rwl_long <- dpl_edt(rwl, keep = long_ids)
 }
 
 }

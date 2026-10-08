@@ -1032,9 +1032,16 @@ dpl_merge <- function(rwl_list, dup_action = "error") {
 #'   list with at minimum `series` (character ID or integer 1-based index) and
 #'   `op` (character; see **Operations**). Additional fields depend on `op`.
 #'   An empty list passes all series through according to `default_action`.
+#' @param keep Series to keep, by ID or 1-based position in `x` (e.g.
+#'   `c("ACC026", "ACC026B")` or `1:5`); all others are left out before any
+#'   edit is applied. Input order is preserved. Cannot be combined with
+#'   `drop`.
+#' @param drop Series to leave out, by ID or position; all others are kept.
+#'   Cannot be combined with `keep`.
 #' @param default_action Character. \code{"copy"} (default) passes unmentioned series
-#'   through; \code{"omit"} drops them --- useful for extracting a named subset without
-#'   listing every series to keep.
+#'   through; \code{"omit"} drops them. This is the DPLEDT way of extracting a
+#'   subset (one `copy` edit per series to keep); `keep` and `drop` do the
+#'   same in one argument.
 #' @param as_rwl Logical. `TRUE` (default) returns a dplR `rwl` data.frame.
 #'   `FALSE` returns the xDPL internal series list for passing to \code{\link{dpl_write}}.
 #' @param verbose Logical. `TRUE` (default) prints one line per series with its
@@ -1095,25 +1102,28 @@ dpl_merge <- function(rwl_list, dup_action = "error") {
 #'   list(series = "ACC026C",  op = "trim_start", first_year = 1856)
 #' ))
 #'
-#' # Extract only the longest series (>= 300 years) without listing every drop
+#' # Extract a subset: by name, by position, or by exclusion
+#' rwl_sub  <- dpl_edt(rwl, keep = c("ACC026", "ACC026B", "ACC026C"))
+#' rwl_sub  <- dpl_edt(rwl, keep = 1:5)
+#' rwl_sub  <- dpl_edt(rwl, drop = "ACC23TA")
 #' long_ids <- colnames(rwl)[colSums(!is.na(rwl)) >= 300]
-#' rwl_long <- dpl_edt(rwl,
-#'   edits = lapply(long_ids, function(id) list(series = id, op = "copy")),
-#'   default_action = "omit"
-#' )
-#' ncol(rwl_long)
+#' rwl_long <- dpl_edt(rwl, keep = long_ids)
 #' }
 #'
 #' @seealso \code{\link{dpl_display}}, \code{\link{dpl_edit_file}}, \code{\link{dpl_cof}}
 #' @export
 dpl_edt <- function(x,
                      edits          = list(),
+                     keep           = NULL,
+                     drop           = NULL,
                      default_action = "copy",
                      as_rwl         = TRUE,
                      verbose        = TRUE) {
 
   if (!default_action %in% c("copy", "omit"))
     stop('"default_action" must be "copy" or "omit".')
+  if (!is.null(keep) && !is.null(drop))
+    stop("Use either 'keep' or 'drop', not both.")
 
   if (.is_rwl(x)) {
     series_list <- .rwl_to_series(x)
@@ -1121,6 +1131,25 @@ dpl_edt <- function(x,
     series_list <- x
   } else {
     stop('"x" must be a dplR data.frame or an xDPL series list.')
+  }
+
+  # ---- keep / drop: select series before any edit is applied ---------------
+  # Names or 1-based positions in the input; input order is preserved
+  # (keep = c(3, 1) still writes series 1 before series 3).
+  if (!is.null(keep) || !is.null(drop)) {
+    ids <- trimws(vapply(series_list, `[[`, character(1), "id"))
+    sel <- if (!is.null(keep)) .resolve_series(keep, ids, "keep")
+           else setdiff(ids, .resolve_series(drop, ids, "drop"))
+    use <- ids %in% sel
+    if (verbose)
+      for (i in which(!use))
+        message(sprintf("No %3d  %-8s  %d - %d (%d yr)  %s",
+                        i, ids[i], series_list[[i]]$yr_start,
+                        series_list[[i]]$yr_start + length(series_list[[i]]$values) - 1L,
+                        length(series_list[[i]]$values),
+                        if (!is.null(keep)) "NOT KEPT" else "DROPPED"))
+    series_list <- series_list[use]
+    if (length(series_list) == 0L) stop("No series left after keep/drop.")
   }
 
   n_ser      <- length(series_list)
@@ -1391,6 +1420,9 @@ dpl_display <- function(x, series = NULL, around_yr = NULL) {
 #' @param output_path Character or `NULL`. Output file path. If `NULL`
 #'   (default), no file is written and the result is returned visibly.
 #' @param edits List of edit instructions; see \code{\link{dpl_edt}} for all operations.
+#' @param keep,drop Series to keep or to leave out, by ID or position; see
+#'   \code{\link{dpl_edt}}. The direct way to copy a subset of samples to a
+#'   new file.
 #' @param format Character. Input format: \code{"auto"} (default), \code{"compact"},
 #'   or \code{"tucson"}.
 #' @param output_format Character or `NULL`. Output format: \code{"compact"} or
@@ -1420,6 +1452,14 @@ dpl_display <- function(x, series = NULL, around_yr = NULL) {
 #'   edits = list(list(series = "ACC014A", op = "trim_start", first_year = 1856)),
 #'   format = "tucson", output_format = "tucson"
 #' )
+#'
+#' # (C) Copy a subset of samples to a new file
+#' dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+#'               keep = c("ACC026", "ACC026B", "ACC026C"), format = "tucson")
+#' dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+#'               keep = 1:5, format = "tucson")
+#' dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+#'               drop = "ACC23TA", format = "tucson")
 #' }
 #'
 #' @seealso \code{\link{dpl_read}}, \code{\link{dpl_edt}}, \code{\link{dpl_write}}
@@ -1427,6 +1467,8 @@ dpl_display <- function(x, series = NULL, around_yr = NULL) {
 dpl_edit_file <- function(path,
                             output_path    = NULL,
                             edits          = list(),
+                            keep           = NULL,
+                            drop           = NULL,
                             format         = "auto",
                             output_format  = NULL,
                             default_action = "copy",
@@ -1445,6 +1487,8 @@ dpl_edit_file <- function(path,
   sl     <- dpl_read(path, format = fmt, as_rwl = FALSE)
   edited <- dpl_edt(sl,
                      edits          = edits,
+                     keep           = keep,
+                     drop           = drop,
                      default_action = default_action,
                      as_rwl         = FALSE,
                      verbose        = verbose)

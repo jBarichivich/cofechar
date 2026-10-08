@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9010 (development)
+# cofechar 1.0.0.9011 (development)
 
 ## New features
 
@@ -20,6 +20,11 @@
   standardised by the master's window mean and SD), so bars are comparable
   across columns and pointer years line up. `pool = TRUE` adds the stand
   mean; `lag` previews a shift suggested by `dpl_short()`.
+* `dpl_edt()` and `dpl_edit_file()` gain `keep` and `drop`: select the
+  samples to copy (or to leave out) by ID or position in one argument, e.g.
+  `dpl_edit_file("site.rwl", output_path = "sub.rwl", keep = c("A01", "A02"))`
+  or `keep = 1:5`. Replaces the DPLEDT idiom of one `copy` edit per series
+  with `default_action = "omit"`, which still works.
 * `dpl_cormat()`: pairwise correlation matrix of all series printed in the
   COFECHA Part 5 style (lower triangle, F4.2 cells with the leading zero
   suppressed, `-` below `min_overlap`), with significance asterisks

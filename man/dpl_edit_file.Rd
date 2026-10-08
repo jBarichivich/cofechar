@@ -8,6 +8,8 @@ dpl_edit_file(
   path,
   output_path = NULL,
   edits = list(),
+  keep = NULL,
+  drop = NULL,
   format = "auto",
   output_format = NULL,
   default_action = "copy",
@@ -22,6 +24,10 @@ dpl_edit_file(
 (default), no file is written and the result is returned visibly.}
 
 \item{edits}{List of edit instructions; see \code{\link{dpl_edt}} for all operations.}
+
+\item{keep, drop}{Series to keep or to leave out, by ID or position; see
+\code{\link{dpl_edt}}. The direct way to copy a subset of samples to a
+new file.}
 
 \item{format}{Character. Input format: \code{"auto"} (default), \code{"compact"},
 or \code{"tucson"}.}
@@ -70,6 +76,14 @@ dpl_edit_file(mir_file, output_path = tmp,
   edits = list(list(series = "ACC014A", op = "trim_start", first_year = 1856)),
   format = "tucson", output_format = "tucson"
 )
+
+# (C) Copy a subset of samples to a new file
+dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+              keep = c("ACC026", "ACC026B", "ACC026C"), format = "tucson")
+dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+              keep = 1:5, format = "tucson")
+dpl_edit_file(mir_file, output_path = tempfile(fileext = ".rwl"),
+              drop = "ACC23TA", format = "tucson")
 }
 
 }

@@ -113,3 +113,38 @@ test_that("dpl_merge dup_action = 'error' fires on duplicate IDs", {
   r <- structure(as.data.frame(m), class = c("rwl","data.frame"))
   expect_error(dpl_merge(list(r, r)), "Duplicate")
 })
+
+test_that("dpl_edt keep/drop select series by name or position before editing", {
+  m <- matrix(runif(20), nrow = 4, ncol = 5,
+               dimnames = list(as.character(1900:1903), c("A", "B", "C", "D", "E")))
+  rwl <- structure(as.data.frame(m), class = c("rwl", "data.frame"))
+  expect_equal(colnames(dpl_edt(rwl, keep = c("B", "D"), verbose = FALSE)), c("B", "D"))
+  expect_equal(colnames(dpl_edt(rwl, keep = 1:3, verbose = FALSE)), c("A", "B", "C"))
+  expect_equal(colnames(dpl_edt(rwl, keep = c(4, 2), verbose = FALSE)), c("B", "D"))  # input order
+  expect_equal(colnames(dpl_edt(rwl, drop = "C", verbose = FALSE)), c("A", "B", "D", "E"))
+  expect_equal(colnames(dpl_edt(rwl, drop = c(1, 5), verbose = FALSE)), c("B", "C", "D"))
+  expect_error(dpl_edt(rwl, keep = "A", drop = "B", verbose = FALSE), "either")
+  expect_error(dpl_edt(rwl, keep = 9, verbose = FALSE), "out of range")
+  expect_warning(dpl_edt(rwl, keep = c("A", "ZZ"), verbose = FALSE), "not found")
+  # edits apply to the kept series; positions in edits refer to the kept set
+  out <- dpl_edt(rwl, keep = c("B", "D"),
+                 edits = list(list(series = "D", op = "replace", year = 1901, value = 9)),
+                 verbose = FALSE)
+  expect_equal(out["1901", "D"], 9)
+  expect_equal(colnames(out), c("B", "D"))
+})
+
+test_that("dpl_edit_file copies a subset of samples to a new file", {
+  m <- matrix(round(runif(30, 0.5, 3), 2), nrow = 6, ncol = 5,
+               dimnames = list(as.character(1990:1995), c("A", "B", "C", "D", "E")))
+  rwl <- structure(as.data.frame(m), class = c("rwl", "data.frame"))
+  src <- tempfile(fileext = ".rwl"); dst <- tempfile(fileext = ".rwl")
+  dpl_write(rwl, src, format = "tucson")
+  dpl_edit_file(src, output_path = dst, keep = c("A", "E"), format = "tucson",
+                verbose = FALSE)
+  back <- dpl_read(dst, format = "tucson")
+  expect_equal(colnames(back), c("A", "E"))
+  expect_equal(unname(unlist(back["1992", ])), unname(unlist(rwl["1992", c("A", "E")])))
+  dpl_edit_file(src, output_path = dst, drop = 2:4, format = "tucson", verbose = FALSE)
+  expect_equal(colnames(dpl_read(dst, format = "tucson")), c("A", "E"))
+})
