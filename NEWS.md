@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9006 (development)
+# cofechar 1.0.0.9007 (development)
 
 ## New features
 
@@ -20,6 +20,12 @@
   standardised by the master's window mean and SD), so bars are comparable
   across columns and pointer years line up. `pool = TRUE` adds the stand
   mean; `lag` previews a shift suggested by `dpl_short()`.
+* `dpl_barplot()`, `dpl_short()` and `dpl_short_barplot()` accept integer
+  positions in `series` (e.g. `1:7`) as well as IDs. For `dpl_barplot()`
+  positions index the columns of `rwl`; for the two short-series functions
+  they index the default set (`cof$short`), so `1:7` means the first seven
+  short series. Unknown IDs warn and are dropped; positions out of range
+  are an error.
 * `dpl_cof()` gains `min_length` (default 10): series with fewer measured
   years are excluded from the master and from segment testing, listed in
   Part 1 and returned in `$short`. COFECHA's CRIT99 table starts at 10 years;

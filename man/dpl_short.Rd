@@ -22,7 +22,9 @@ series present are ignored unless named in \code{series}).}
 \item{cof_result}{The list returned by \code{\link{dpl_cof}}. Its master
 must have been built without the series being tested (see Workflow).}
 
-\item{series}{Character vector of series to test. Default: those listed in
+\item{series}{Series to test: a character vector of IDs, or an integer
+vector of positions within the default set (e.g. \code{1:7} for the
+first seven short series). Default \code{NULL}: all series in
 \code{cof_result$short}, or all columns of \code{rwl} if that is empty.}
 
 \item{max_lag}{Integer (default \code{2L}). Shifts tested on each side of

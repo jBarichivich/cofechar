@@ -1516,6 +1516,27 @@ dpl_edit_file <- function(path,
 .cof_f72 <- function(v)  sprintf("%7.2f", v)   # values > 1 — no leading zero issue
 
 
+# .resolve_series  --  character IDs or 1-based positions -> character IDs
+#   pool: the IDs that positions index into (e.g. colnames(rwl)); unknown
+#   names warn and are dropped, out-of-range positions are an error, the
+#   order of 'sel' is kept.
+.resolve_series <- function(sel, pool, what = "series") {
+  if (is.null(sel)) return(pool)
+  if (is.numeric(sel)) {
+    idx <- as.integer(sel)
+    bad <- idx[is.na(idx) | idx < 1L | idx > length(pool)]
+    if (length(bad))
+      stop(sprintf("'%s' positions out of range (1..%d): %s",
+                   what, length(pool), paste(bad, collapse = ", ")))
+    return(pool[idx])
+  }
+  sel  <- as.character(sel)
+  miss <- setdiff(sel, pool)
+  if (length(miss))
+    warning(sprintf("'%s' not found and ignored: %s", what, paste(miss, collapse = ", ")))
+  sel[sel %in% pool]
+}
+
 # .cof_nint  --  Fortran NINT: round half AWAY from zero
 #   R's round() is IEC 60559 round-half-to-even, so round(80.5) == 80 while
 #   Fortran NINT(80.5) == 81.  BARPL's decile indices hit exact .5 for some
@@ -4412,8 +4433,10 @@ dpl_dateme <- function(rwl_undated,
 #' @param rwl A dplR `rwl` data.frame **or** the list returned by \code{\link{dpl_cof}}
 #'   (uses `$master`) **or** a named numeric vector (single series,
 #'   names = years).
-#' @param series Character vector of series IDs to plot. `NULL` (default) plots
-#'   all columns. For a `cof_result` input, \code{"master"} is always available.
+#' @param series Series to plot: a character vector of IDs or an integer
+#'   vector of column positions in `rwl` (e.g. `1:7`). `NULL` (default)
+#'   plots all columns. For a `cof_result` input, \code{"master"} is always
+#'   available.
 #' @param years Integer vector `c(first, last)` defining the display period.
 #'   `NULL` (default) uses each series' full span. Normalisation always uses
 #'   the full span by default (see `norm_scope`).
@@ -4477,7 +4500,7 @@ dpl_barplot <- function(rwl,
                                      as.character(yrs_m))
   } else if (is.data.frame(rwl)) {
     all_ids <- colnames(rwl)
-    ids_use <- if (!is.null(series)) intersect(series, all_ids) else all_ids
+    ids_use <- .resolve_series(series, all_ids)
     if (length(ids_use) == 0L)
       stop("No series found matching 'series' argument.")
     yrs_all <- as.integer(rownames(rwl))
@@ -4490,7 +4513,7 @@ dpl_barplot <- function(rwl,
       ser_list[[sid]] <- setNames(as.numeric(v), as.character(yrs_all[j1:j2]))
     }
   } else if (is.numeric(rwl) && !is.null(names(rwl))) {
-    sid <- if (!is.null(series)) series[1L] else "series"
+    sid <- if (is.character(series)) series[1L] else "series"
     ser_list[[sid]] <- rwl
   } else {
     stop("'rwl' must be a dplR rwl data.frame, a cof_result list, ",

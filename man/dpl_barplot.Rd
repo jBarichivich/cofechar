@@ -21,8 +21,10 @@ dpl_barplot(
 (uses `$master`) **or** a named numeric vector (single series,
 names = years).}
 
-\item{series}{Character vector of series IDs to plot. `NULL` (default) plots
-all columns. For a `cof_result` input, \code{"master"} is always available.}
+\item{series}{Series to plot: a character vector of IDs or an integer
+vector of column positions in `rwl` (e.g. `1:7`). `NULL` (default)
+plots all columns. For a `cof_result` input, \code{"master"} is always
+available.}
 
 \item{years}{Integer vector `c(first, last)` defining the display period.
 `NULL` (default) uses each series' full span. Normalisation always uses

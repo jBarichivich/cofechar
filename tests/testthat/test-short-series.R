@@ -150,3 +150,29 @@ test_that("dpl_short_barplot prints master and samples on the master's scale", {
   f <- tempfile(); dpl_short_barplot(rwl, cof, quiet = TRUE, output_file = f)
   expect_equal(readLines(f), out)
 })
+
+test_that("series can be selected by position in dpl_barplot, dpl_short and dpl_short_barplot", {
+  set.seed(6)
+  sig <- cumsum(rnorm(60)); sig <- abs(sig / max(abs(sig)) * 2) + 0.5
+  rwl <- mk_rwl(1950:2009,
+                A = ser(sig * exp(rnorm(60, sd = 0.15))),
+                B = ser(sig * exp(rnorm(60, sd = 0.15))),
+                C = ser(sig * exp(rnorm(60, sd = 0.15))),
+                S1 = ser(sig[54:60], offset = 53L),
+                S2 = ser(sig[55:60], offset = 54L),
+                S3 = ser(sig[56:60], offset = 55L))
+  # dpl_barplot: positions are columns of rwl
+  out <- dpl_barplot(rwl, series = 2:3, quiet = TRUE)
+  expect_equal(names(out), c("B", "C"))
+  expect_error(dpl_barplot(rwl, series = 7, quiet = TRUE), "out of range")
+  cof <- dpl_cof(rwl, verbose = FALSE, parts = integer(0))
+  expect_equal(cof$short$series, c("S1", "S2", "S3"))
+  # dpl_short / dpl_short_barplot: positions index the short set
+  chk <- dpl_short(rwl, cof, series = 1:2)
+  expect_equal(chk$summary$series, c("S1", "S2"))
+  bp  <- dpl_short_barplot(rwl, cof, series = c(1, 3), pool = FALSE, quiet = TRUE)
+  expect_true(any(grepl("S1 ", bp)) && any(grepl("S3", bp)))
+  expect_false(any(grepl("S2", bp)))
+  # character still works and unknown names warn
+  expect_warning(dpl_short(rwl, cof, series = c("S1", "ZZ")), "not found")
+})

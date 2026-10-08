@@ -34,8 +34,10 @@
 #' @param rwl A dplR \code{rwl} data.frame holding the short series.
 #' @param cof_result The list returned by \code{\link{dpl_cof}}; its
 #'   \code{$master_raw} is displayed and sets the scale.
-#' @param series Character vector of series to show. Default: those in
-#'   \code{cof_result$short}, else all columns of \code{rwl}.
+#' @param series Series to show: a character vector of IDs, or an integer
+#'   vector of positions within the default set (e.g. \code{1:7} for the
+#'   first seven short series). Default \code{NULL}: all series in
+#'   \code{cof_result$short}, or all columns of \code{rwl} if that is empty.
 #' @param years Integer vector \code{c(first, last)}. Display window. Default:
 #'   the years covered by at least two of the selected series, extended by
 #'   \code{margin} years on each side for context; one unusually long sample
@@ -76,11 +78,14 @@ dpl_short_barplot <- function(rwl, cof_result,
   if (!.is_rwl(rwl)) stop("'rwl' must be a dplR rwl data.frame.")
   if (is.null(cof_result$master_raw))
     stop("'cof_result' must be the output of dpl_cof().")
-  if (is.null(series)) {
-    series <- if (!is.null(cof_result$short) && nrow(cof_result$short) > 0L)
-      cof_result$short$series else colnames(rwl)
-  }
-  series <- intersect(series, colnames(rwl))
+  # Positions index into the default set: the series set aside by dpl_cof
+  # (cof_result$short), or all columns of rwl if none were.
+  default_set <- if (!is.null(cof_result$short) && nrow(cof_result$short) > 0L)
+    cof_result$short$series else colnames(rwl)
+  default_set <- intersect(default_set, colnames(rwl))
+  series <- if (is.null(series)) default_set
+            else if (is.numeric(series)) .resolve_series(series, default_set)
+            else .resolve_series(series, colnames(rwl))
   if (length(series) == 0L) stop("No series to plot.")
 
   yrs_rwl <- as.integer(rownames(rwl))

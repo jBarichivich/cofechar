@@ -22,8 +22,10 @@ dpl_short_barplot(
 \item{cof_result}{The list returned by \code{\link{dpl_cof}}; its
 \code{$master_raw} is displayed and sets the scale.}
 
-\item{series}{Character vector of series to show. Default: those in
-\code{cof_result$short}, else all columns of \code{rwl}.}
+\item{series}{Series to show: a character vector of IDs, or an integer
+vector of positions within the default set (e.g. \code{1:7} for the
+first seven short series). Default \code{NULL}: all series in
+\code{cof_result$short}, or all columns of \code{rwl} if that is empty.}
 
 \item{years}{Integer vector \code{c(first, last)}. Display window. Default:
 the years covered by at least two of the selected series, extended by

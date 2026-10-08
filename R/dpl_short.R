@@ -166,7 +166,9 @@
 #'   series present are ignored unless named in \code{series}).
 #' @param cof_result The list returned by \code{\link{dpl_cof}}. Its master
 #'   must have been built without the series being tested (see Workflow).
-#' @param series Character vector of series to test. Default: those listed in
+#' @param series Series to test: a character vector of IDs, or an integer
+#'   vector of positions within the default set (e.g. \code{1:7} for the
+#'   first seven short series). Default \code{NULL}: all series in
 #'   \code{cof_result$short}, or all columns of \code{rwl} if that is empty.
 #' @param max_lag Integer (default \code{2L}). Shifts tested on each side of
 #'   lag 0.
@@ -234,11 +236,14 @@ dpl_short <- function(rwl, cof_result,
   if (is.null(cof_result$master_raw))
     stop("'cof_result' must be the output of dpl_cof().")
 
-  if (is.null(series)) {
-    series <- if (!is.null(cof_result$short) && nrow(cof_result$short) > 0L)
-      cof_result$short$series else colnames(rwl)
-  }
-  series <- intersect(series, colnames(rwl))
+  # Positions index into the default set: the series set aside by dpl_cof
+  # (cof_result$short), or all columns of rwl if none were.
+  default_set <- if (!is.null(cof_result$short) && nrow(cof_result$short) > 0L)
+    cof_result$short$series else colnames(rwl)
+  default_set <- intersect(default_set, colnames(rwl))
+  series <- if (is.null(series)) default_set
+            else if (is.numeric(series)) .resolve_series(series, default_set)
+            else .resolve_series(series, colnames(rwl))
   if (length(series) == 0L) stop("No series to test.")
 
   max_lag <- as.integer(max_lag)
