@@ -40,3 +40,15 @@ test_that("dpl_print_pdf accepts a dpl_barplot list and bare lines, portrait whe
   # forcing a font that cannot fit is an error, not a wrap
   expect_error(dpl_print_pdf(cof, tempfile(fileext = ".pdf"), font_size = 14), "does not fit")
 })
+
+test_that("dpl_print_pdf parts= prints only the requested COFECHA parts", {
+  cof <- pel_cof()
+  f <- tempfile(fileext = ".pdf")
+  r4 <- dpl_print_pdf(cof, f, parts = 4)
+  expect_equal(r4$pages, 2L)                      # PEL: 1862-2022 = two 400-yr pages
+  f2 <- tempfile(fileext = ".pdf")
+  r56 <- dpl_print_pdf(cof, f2, parts = c(5, 6))
+  expect_true(r56$pages >= 2L && r56$pages < r4$pages + 6L)
+  expect_error(dpl_print_pdf(cof, tempfile(), parts = 9), "None of parts")
+  expect_error(dpl_print_pdf(c("a", "b"), tempfile(), parts = 1), "no 'PART n' headers")
+})

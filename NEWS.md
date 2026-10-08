@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9009 (development)
+# cofechar 1.0.0.9010 (development)
 
 ## New features
 
@@ -36,7 +36,8 @@
   fits the page width and a complete 400-year bar-plot page fits one sheet;
   page breaks fall on PART headers, series blocks and bar-plot pages, never
   inside a block. Orientation is chosen automatically (landscape for
-  132-column output, portrait for narrower text).
+  132-column output, portrait for narrower text). `parts = 4` prints only
+  the master bar plot of a COFECHA output; any subset of 1:7 can be chosen.
 * `dpl_barplot()`, `dpl_short()` and `dpl_short_barplot()` accept integer
   positions in `series` (e.g. `1:7`) as well as IDs. For `dpl_barplot()`
   positions index the columns of `rwl`; for the two short-series functions

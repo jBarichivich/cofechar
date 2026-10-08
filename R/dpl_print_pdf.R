@@ -35,6 +35,10 @@
 #'   \code{\link{dpl_cof}} (its \code{$output} is used) or by
 #'   \code{\link{dpl_barplot}} (elements are concatenated).
 #' @param file Output PDF path.
+#' @param parts Integer vector or \code{NULL} (default). When \code{x} is a
+#'   COFECHA output, print only these parts (e.g. \code{4} for the bar plot
+#'   of the master, \code{c(5, 6)} for the segment table and the problem
+#'   diagnostics). Blocks are cut at the \code{PART n} headers.
 #' @param title Character. Running header on every page. Default: the file
 #'   name without extension.
 #' @param paper \code{"a4"} (default) or \code{"letter"}.
@@ -56,8 +60,8 @@
 #' \dontrun{
 #' cof <- dpl_cof(rwl_all, output_file = "MAI.COF")
 #' dpl_print_pdf(cof, "MAI_COF.pdf")                    # full 7-part output
-#' dpl_print_pdf(cof$output[grep("^PART 4", cof$output)[1]:length(cof$output)],
-#'               "MAI_part4.pdf")                        # from Part 4 on
+#' dpl_print_pdf(cof, "MAI_part4.pdf", parts = 4)       # master bar plot only
+#' dpl_print_pdf(cof, "MAI_problems.pdf", parts = 5:6)  # segments + diagnostics
 #'
 #' bp <- dpl_barplot(rwl_all, series = 1:8, quiet = TRUE)
 #' dpl_print_pdf(bp, "MAI_barplots.pdf")                # one series block per page
@@ -70,6 +74,7 @@
 #'   \code{\link{dpl_cof}}
 #' @export
 dpl_print_pdf <- function(x, file,
+                          parts        = NULL,
                           title        = NULL,
                           paper        = c("a4", "letter"),
                           orientation  = c("auto", "portrait", "landscape"),
@@ -86,6 +91,21 @@ dpl_print_pdf <- function(x, file,
   lines <- if (is.list(x) && !is.null(x$output)) x$output
            else if (is.list(x)) unlist(x, use.names = FALSE)
            else as.character(x)
+  if (!is.null(parts)) {
+    # keep the requested PART blocks of a COFECHA output: each block runs
+    # from its "PART n" header to the line before the next header
+    hdr <- grep("^\\s*PART \\d", lines)
+    if (length(hdr) == 0L) stop("'parts' given but no 'PART n' headers found in the text.")
+    num <- as.integer(sub("^\\s*PART (\\d).*", "\\1", lines[hdr]))
+    end <- c(hdr[-1L] - 1L, length(lines))
+    keep <- which(num %in% as.integer(parts))
+    if (length(keep) == 0L)
+      stop(sprintf("None of parts %s present (found: %s).",
+                   paste(parts, collapse = ","), paste(unique(num), collapse = ",")))
+    lines <- unlist(lapply(keep, function(i) lines[hdr[i]:end[i]]), use.names = FALSE)
+    # the COFECHA trailer belongs to the last block; drop it unless Part 7 asked
+    if (!(7L %in% parts)) lines <- lines[!grepl("^\\s+- = \\[ COFECHA \\] = -", lines)]
+  }
   lines <- sub("\\s+$", "", lines)
   lines <- unlist(strsplit(lines, "\n", fixed = TRUE))   # embedded newlines
   if (length(lines) == 0L) stop("Nothing to print.")
