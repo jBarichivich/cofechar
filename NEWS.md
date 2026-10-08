@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9015 (development)
+# cofechar 1.0.0.9016 (development)
 
 ## New features
 
@@ -71,6 +71,11 @@
   each bar is a scale drawing of the core, aligned at the bark or the pith
   (`align`), with pointer years as coloured strips inside the cells and year
   ticks above each bar. Returns the decile matrix and the pointer-year table.
+
+* `plot_cof_coverage()`: timelines of the series (one line per core,
+  stacked, with the sample depth underneath) on the calendar axis, or aligned
+  at the first ring (cambial age, the RCS view, with optional pith offsets
+  and a replication threshold line) or at the last ring.
 
 ## Bug fixes
 
