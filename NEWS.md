@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9012 (development)
+# cofechar 1.0.0.9013 (development)
 
 ## New features
 
@@ -70,6 +70,13 @@
 * `.cof_spline()` crashed with "subscript out of bounds" on series of
   exactly 4 years (R's `a:b` counts backwards where a Fortran DO loop would
   not execute).
+
+## Documentation
+
+* `dpl_edt()` examples now cover every DPLEDT operation on the CL-MIR data:
+  replace, first_year / last_year redating, insert and delete with both
+  `move` directions, trim_start / trim_end, rename followed by a positional
+  edit, a multi-edit call, and `keep` combined with `edits`.
 
 # cofechar 1.0.0
 

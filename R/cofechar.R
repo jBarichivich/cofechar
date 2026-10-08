@@ -1098,8 +1098,8 @@ dpl_merge <- function(rwl_list, dup_action = "error", trim = TRUE) {
 #'
 #' @section Operations (`op` field):
 #' \describe{
-#'   \item{\code{"copy"}}{Pass through unchanged. Overrides \code{"omit"} for specific
-#'     for specific series. No additional fields.}
+#'   \item{\code{"copy"}}{Pass through unchanged. Overrides \code{"omit"} for
+#'     specific series. No additional fields.}
 #'   \item{\code{"omit"}}{Drop the series. No additional fields.}
 #'   \item{\code{"rename"}}{Change the series ID. Field: `new_id` (character).
 #'     Subsequent edits in the same call must still use the original ID; use the
@@ -1136,27 +1136,106 @@ dpl_merge <- function(rwl_list, dup_action = "error", trim = TRUE) {
 #' rwl <- dpl_read_dec(mir_file, label_length = NULL, stop_val = -9999L,
 #'                     unit = "0.001mm")
 #'
-#' # Inspect a year before editing
-#' dpl_display(rwl, series = "ACC014A", around_yr = 1950)
+#' # Look at the rings around a year before editing
+#' dpl_display(rwl, series = "ACC014A", around_yr = 1953)
 #'
-#' # Replace a suspicious value
+#' ## --- Single operations ----------------------------------------------
+#'
+#' # Replace one value (a transposed reading: 0.056 entered, 0.065 measured)
 #' rwl_ed <- dpl_edt(rwl, edits = list(
-#'   list(series = "ACC014A", op = "replace", year = 1953, value = 0.26)
+#'   list(series = "ACC014A", op = "replace", year = 1953, value = 0.065)
+#' ))
+#' rwl_ed["1953", "ACC014A"]
+#'
+#' # Redate a whole series from the inside: the innermost ring is 1768,
+#' # not 1767. Every ring shifts by +1 (1767--1994 becomes 1768--1995).
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014B", op = "first_year", new_first_year = 1768)
 #' ))
 #'
-#' # Trim the shortest series to the common overlap period (post-1856)
+#' # Redate from the outside: the outer ring was formed in 2001, not 2000
 #' rwl_ed <- dpl_edt(rwl, edits = list(
-#'   list(series = "ACC026B",  op = "trim_start", first_year = 1856),
-#'   list(series = "ACC026",   op = "trim_start", first_year = 1856),
-#'   list(series = "ACC026C",  op = "trim_start", first_year = 1856)
+#'   list(series = "ACC013B", op = "last_year", new_last_year = 2001)
 #' ))
 #'
-#' # Extract a subset: by name, by position, or by exclusion
+#' # Insert a ring missed on this radius before 1900 (a locally absent ring
+#' # seen on another core). move = "back" (default) keeps the outer date and
+#' # makes the inner part one year older (1775 -> 1774); move = "forward"
+#' # keeps the pith date and moves the outer ring to 2001.
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014A", op = "insert", year = 1900, value = 0.02)
+#' ))
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014A", op = "insert", year = 1900, value = 0.02,
+#'        move = "forward")
+#' ))
+#'
+#' # Delete a false ring counted at 1930. move = "forward" (default) keeps
+#' # the outer date and makes the inner part one year younger (1775 -> 1776);
+#' # move = "back" keeps the pith date and pulls the outer ring in to 1999.
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014A", op = "delete", year = 1930)
+#' ))
+#'
+#' # Discard rotten or unreadable rings at either end
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC14TC", op = "trim_end",   last_year  = 1940),
+#'   list(series = "ACC026B", op = "trim_start", first_year = 1500)
+#' ))
+#'
+#' # Rename a core. A later edit to the same series in the same call must
+#' # use its position (or the OLD id), never the new id.
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC14TC", op = "rename",   new_id    = "ACC014C"),
+#'   list(series = 21,        op = "trim_end", last_year = 1940)
+#' ))
+#' colnames(rwl_ed)[21]
+#'
+#' ## --- Several corrections in one reproducible call --------------------
+#'
+#' # The edit list is the whole record of what was changed: keep it in the
+#' # script instead of overwriting the measurement file.
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014A", op = "replace",    year = 1953, value = 0.065),
+#'   list(series = "ACC014A", op = "delete",     year = 1930),
+#'   list(series = "ACC014B", op = "first_year", new_first_year = 1768),
+#'   list(series = "ACC14TC", op = "omit")
+#' ), verbose = FALSE)
+#'
+#' # Trim the three longest series to the start of the well-replicated period
+#' rwl_ed <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC026B", op = "trim_start", first_year = 1856),
+#'   list(series = "ACC026",  op = "trim_start", first_year = 1856),
+#'   list(series = "ACC026C", op = "trim_start", first_year = 1856)
+#' ))
+#'
+#' ## --- Subsets: by name, by position, by exclusion ---------------------
+#'
 #' rwl_sub  <- dpl_edt(rwl, keep = c("ACC026", "ACC026B", "ACC026C"))
 #' rwl_sub  <- dpl_edt(rwl, keep = 1:5)
 #' rwl_sub  <- dpl_edt(rwl, drop = "ACC23TA")
 #' long_ids <- colnames(rwl)[colSums(!is.na(rwl)) >= 300]
 #' rwl_long <- dpl_edt(rwl, keep = long_ids)
+#'
+#' # keep and edits together: extract one core and correct it in one call.
+#' # The result spans only that core's years (1775--2000), not the whole
+#' # collection.
+#' one <- dpl_edt(rwl, keep = "ACC014A", edits = list(
+#'   list(series = "ACC014A", op = "replace", year = 1953, value = 0.065)
+#' ))
+#' range(as.integer(rownames(one)))
+#'
+#' ## --- Check the result and write it out -------------------------------
+#'
+#' dpl_display(rwl_ed, series = "ACC014A", around_yr = 1953)
+#' cof <- dpl_cof(rwl_ed, parts = 7, verbose = FALSE)
+#' cof$stats
+#'
+#' # Internal series list for dpl_write(), e.g. to feed another program
+#' ser <- dpl_edt(rwl, edits = list(
+#'   list(series = "ACC014A", op = "delete", year = 1930)
+#' ), as_rwl = FALSE, verbose = FALSE)
+#' dpl_write(ser, "CL-MIR_edited.rwl")
 #' }
 #'
 #' @seealso \code{\link{dpl_display}}, \code{\link{dpl_edit_file}}, \code{\link{dpl_cof}}
