@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9013 (development)
+# cofechar 1.0.0.9014 (development)
 
 ## New features
 
@@ -61,6 +61,13 @@
   3 or 4 values). Legacy behaviour: `min_length = 1`.
 * `dpl_read_dec()` gains `na_val` (default `c(-999, -9999)`): within-series
   missing markers become `NA` instead of -9.99 mm.
+
+* `plot_cof_rings()`: ring-width diagram of a collection in the TSAP-Win
+  layout -- one bar per core spanning its years, one cell per ring shaded by
+  its within-series decile (dark = narrow) or by the COFECHA-transformed
+  index, pointer years marked where most cores agree, optional vertical rules
+  at known event years, sorting by first/last year or length, and grouping of
+  cores by tree. Returns the decile matrix and the pointer-year table.
 
 ## Bug fixes
 

@@ -1,7 +1,7 @@
 Package: cofechar
 Type: Package
 Title: COFECHA and EDT — R Port of the DPL Dendrochronology Program Library
-Version: 1.0.0.9013
+Version: 1.0.0.9014
 Date: 2026
 Authors@R: c(
     person("Jonathan", "Barichivich", role = c("aut", "cre"),
