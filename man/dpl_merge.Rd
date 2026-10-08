@@ -4,7 +4,7 @@
 \alias{dpl_merge}
 \title{Merge two or more rwl objects onto a common year axis}
 \usage{
-dpl_merge(rwl_list, dup_action = "error")
+dpl_merge(rwl_list, dup_action = "error", trim = TRUE)
 }
 \arguments{
 \item{rwl_list}{A list of at least two dplR `rwl` data.frames (or plain
@@ -17,6 +17,12 @@ more than one input:
   \item{\code{"suffix"}}{Append `_2`, `_3`, ... to duplicate IDs, with a warning.}
   \item{\code{"keep"}}{Allow duplicate column names (may confuse dplR functions).}
 }}
+
+\item{trim}{Logical (default \code{TRUE}). Drop leading and trailing
+years in which no series has a value, so the result spans only the
+merged series even when the inputs carry all-\code{NA} rows from an
+earlier column subset (see \code{\link{dpl_trim}}). \code{FALSE}
+keeps the union of the inputs' row ranges.}
 }
 \value{
 A `c("rwl","data.frame")` spanning the full union year range, with

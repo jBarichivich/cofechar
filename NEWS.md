@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9011 (development)
+# cofechar 1.0.0.9012 (development)
 
 ## New features
 
@@ -20,6 +20,11 @@
   standardised by the master's window mean and SD), so bars are comparable
   across columns and pointer years line up. `pool = TRUE` adds the stand
   mean; `lag` previews a shift suggested by `dpl_short()`.
+* `dpl_trim()`: drop the leading and trailing all-`NA` years of an `rwl`,
+  so a column subset (`rwl[, c("A", "B")]`, which keeps the full year axis)
+  spans only the selected series; `dpl_trim(rwl, series = 1:5)` subsets
+  and trims in one step. `dpl_merge()` now trims by default (`trim = FALSE`
+  for the old behaviour); `dpl_edt()` already did.
 * `dpl_edt()` and `dpl_edit_file()` gain `keep` and `drop`: select the
   samples to copy (or to leave out) by ID or position in one argument, e.g.
   `dpl_edit_file("site.rwl", output_path = "sub.rwl", keep = c("A01", "A02"))`

@@ -886,6 +886,50 @@ dpl_read_dec <- function(file,
 }
 
 
+#' Trim an rwl to the years covered by its series
+#'
+#' @description
+#' Removes the leading and trailing years in which no series has a value, so
+#' that the first row is the first year of the earliest series and the last
+#' row the last year of the latest. Subsetting columns with \code{[} keeps
+#' the full year axis of the original collection (rows of \code{NA} for the
+#' years the selected series do not cover); \code{dpl_trim} restores a
+#' frame that spans only the selected series. \code{\link{dpl_edt}} and
+#' \code{\link{dpl_merge}} already return trimmed frames.
+#'
+#' @param rwl A dplR \code{rwl} data.frame.
+#' @param series Optional: series to keep before trimming, by ID or
+#'   position (a shortcut for \code{dpl_trim(rwl[, series])}).
+#'
+#' @return The \code{rwl} with only the years between the first and last
+#'   non-missing value of any column; interior years are never removed.
+#'   An all-\code{NA} input returns a 0-row frame.
+#'
+#' @examples
+#' \dontrun{
+#' sub <- rwl[, c("ACC026", "ACC026B")]   # still 1406-2002 rows, mostly NA
+#' sub <- dpl_trim(sub)                    # now spans the two series only
+#' sub <- dpl_trim(rwl, series = 1:5)      # same in one step
+#' }
+#'
+#' @seealso \code{\link{dpl_edt}}, \code{\link{dpl_merge}}
+#' @export
+dpl_trim <- function(rwl, series = NULL) {
+  if (!.is_rwl(rwl)) stop("'rwl' must be a dplR rwl data.frame.")
+  if (!is.null(series))
+    rwl <- rwl[, .resolve_series(series, colnames(rwl)), drop = FALSE]
+  has <- rowSums(!is.na(rwl)) > 0L
+  if (!any(has)) {
+    out <- rwl[integer(0), , drop = FALSE]
+  } else {
+    r   <- range(which(has))
+    out <- rwl[seq(r[1L], r[2L]), , drop = FALSE]
+  }
+  class(out) <- c("rwl", "data.frame")
+  out
+}
+
+
 #' Merge two or more rwl objects onto a common year axis
 #'
 #' @description
@@ -896,6 +940,11 @@ dpl_read_dec <- function(file,
 #'
 #' @param rwl_list A list of at least two dplR `rwl` data.frames (or plain
 #'   `data.frame`s with integer-coercible row names and at least one column).
+#' @param trim Logical (default \code{TRUE}). Drop leading and trailing
+#'   years in which no series has a value, so the result spans only the
+#'   merged series even when the inputs carry all-\code{NA} rows from an
+#'   earlier column subset (see \code{\link{dpl_trim}}). \code{FALSE}
+#'   keeps the union of the inputs' row ranges.
 #' @param dup_action Character. Action when the same series ID appears in
 #'   more than one input:
 #'   \describe{
@@ -927,7 +976,7 @@ dpl_read_dec <- function(file,
 #'
 #' @seealso \code{\link{dpl_read}}, \code{\link{dpl_edt}}, \code{\link{dpl_write}}
 #' @export
-dpl_merge <- function(rwl_list, dup_action = "error") {
+dpl_merge <- function(rwl_list, dup_action = "error", trim = TRUE) {
 
   # --- Input validation -----------------------------------------------------
   if (!is.list(rwl_list) || length(rwl_list) < 2L)
@@ -1013,7 +1062,7 @@ dpl_merge <- function(rwl_list, dup_action = "error") {
   }
 
   class(out) <- c("rwl", "data.frame")
-  out
+  if (isTRUE(trim)) dpl_trim(out) else out
 }
 
 

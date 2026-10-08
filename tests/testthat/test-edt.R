@@ -148,3 +148,28 @@ test_that("dpl_edit_file copies a subset of samples to a new file", {
   dpl_edit_file(src, output_path = dst, drop = 2:4, format = "tucson", verbose = FALSE)
   expect_equal(colnames(dpl_read(dst, format = "tucson")), c("A", "E"))
 })
+
+test_that("dpl_trim and dpl_merge(trim = TRUE) span only the selected series", {
+  f   <- system.file("extdata", "benchmark", "PEL.rwl", package = "cofechar")
+  rwl <- dpl_read_dec(f, stop_val = 999L, unit = "0.01mm")        # 1862-2022
+  yrs <- function(x) range(as.integer(rownames(x)))
+  one <- rwl[, "PEL14A", drop = FALSE]                            # [ ] keeps 1862
+  expect_equal(yrs(one), c(1862L, 2022L))
+  expect_equal(yrs(dpl_trim(one)), c(1968L, 2022L))
+  expect_equal(dim(dpl_trim(one)), c(55L, 1L))
+  expect_equal(yrs(dpl_trim(rwl, series = c("PEL14A", "PEL07A"))), c(1962L, 2022L))
+  expect_equal(yrs(dpl_trim(rwl, series = 5)), c(1968L, 2022L))
+  # keep/drop in dpl_edt already trim
+  expect_equal(yrs(dpl_edt(rwl, keep = "PEL14A", verbose = FALSE)), c(1968L, 2022L))
+  expect_equal(yrs(dpl_edt(rwl, drop = "PEL11A", verbose = FALSE)), c(1929L, 2022L))
+  # dpl_merge of [ ]-subsets now trims by default; trim = FALSE keeps the union
+  m <- dpl_merge(list(rwl[, "PEL14A", drop = FALSE], rwl[, "PEL07A", drop = FALSE]))
+  expect_equal(yrs(m), c(1962L, 2022L))
+  m2 <- dpl_merge(list(rwl[, "PEL14A", drop = FALSE], rwl[, "PEL07A", drop = FALSE]), trim = FALSE)
+  expect_equal(yrs(m2), c(1862L, 2022L))
+  # interior gaps are never removed; all-NA gives 0 rows
+  g <- rwl[, "PEL06B", drop = FALSE]; g["1950", 1] <- NA
+  expect_equal(nrow(dpl_trim(g)), 94L)
+  expect_equal(nrow(dpl_trim(rwl[, "PEL06B", drop = FALSE][0, , drop = FALSE])), 0L)
+  expect_s3_class(dpl_trim(one), "rwl")
+})
