@@ -1805,8 +1805,10 @@ dpl_edit_file <- function(path,
   }
 
   # -- back substitution UX = Y
+  # Fortran DO loops with an empty range do not execute; R's a:b counts
+  # backwards, so guard the two loops below for nm2 < 3 (series of 4 years).
   A[nm2, 4L] <- A[nm2, 4L] * A[nm2, ncp1]
-  for (i in 2L:nm2) {
+  for (i in seq_len(nm2)[-1L]) {
     kk  <- nm2 + 1L - i
     s   <- A[kk, 4L]
     kl  <- kk + 1L
@@ -1821,7 +1823,7 @@ dpl_edit_file <- function(path,
 
   # Reconstruct spline from second differences
   f <- numeric(n)
-  for (i in 3L:nm2)
+  for (i in seq_len(nm2)[-(1:2)])
     f[i] <- A[i - 2L, 4L] + c1[4L] * A[i - 1L, 4L] + A[i, 4L]
   f[1L] <- A[1L, 4L]
   f[2L] <- c1[4L] * A[1L, 4L] + A[2L, 4L]
