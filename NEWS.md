@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9014 (development)
+# cofechar 1.0.0.9015 (development)
 
 ## New features
 
@@ -67,7 +67,10 @@
   its within-series decile (dark = narrow) or by the COFECHA-transformed
   index, pointer years marked where most cores agree, optional vertical rules
   at known event years, sorting by first/last year or length, and grouping of
-  cores by tree. Returns the decile matrix and the pointer-year table.
+  cores by tree. `xaxis = "length"` draws every cell as wide as its ring, so
+  each bar is a scale drawing of the core, aligned at the bark or the pith
+  (`align`), with pointer years as coloured strips inside the cells and year
+  ticks above each bar. Returns the decile matrix and the pointer-year table.
 
 ## Bug fixes
 

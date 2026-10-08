@@ -8,6 +8,8 @@ plot_cof_rings(
   rwl,
   cof_result = NULL,
   series = NULL,
+  xaxis = c("year", "length"),
+  align = c("outer", "inner"),
   sort = c("none", "first", "last", "length", "id"),
   shade = c("decile", "index", "none"),
   palette = "grey",
@@ -36,6 +38,20 @@ automatically when \code{NULL}.}
 
 \item{series}{Series to draw: character IDs or integer positions. Default
 all.}
+
+\item{xaxis}{\code{"year"} (default): calendar years on the x axis, every
+ring the same width, so rings of the same year line up across cores.
+\code{"length"}: cumulative ring width in mm, so every cell is as wide as
+the ring it represents and each bar is a scale drawing of the core; the
+bars are aligned at the bark (\code{align = "outer"}) or at the pith
+(\code{"inner"}). Pointer years are then shown as a coloured strip along
+the lower edge of the ring's cell, marked years as a tick above it, and
+every \code{grid_by}-th year as a small tick above the bar, since years
+no longer line up between cores.}
+
+\item{align}{For \code{xaxis = "length"}: \code{"outer"} (default) puts the
+last ring at 0 on the right and measures inwards; \code{"inner"} puts the
+first ring at 0 on the left.}
 
 \item{sort}{\code{"none"} (default, file order), \code{"first"} (oldest
 inner ring on top), \code{"last"}, \code{"length"}, or \code{"id"}.}
@@ -66,8 +82,9 @@ bracket drawn beside their labels. E.g. \code{function(id) substr(id, 1,
 \item{years}{Integer vector of length 2, year range to draw. Default: the
 span of the selected series.}
 
-\item{grid_by}{Integer. Spacing of year gridlines; \code{NULL} (default)
-picks 10, 50, 100 or 200 from the span.}
+\item{grid_by}{Integer. Spacing of year gridlines (and, with
+\code{xaxis = "length"}, of the small year ticks above each bar);
+\code{NULL} (default) picks 10, 50, 100 or 200 from the span.}
 
 \item{bar_height}{Numeric in (0, 1] (default \code{0.72}). Fraction of the
 row occupied by the bar; the remainder is the gap between cores.}
@@ -92,7 +109,9 @@ Invisibly, a list with \code{deciles} (matrix years x series, the
 }
 \description{
 Draws the layout familiar from TSAP-Win: each series is a horizontal bar
-spanning its calendar years, divided into one cell per ring. Cells are
+divided into one cell per ring, placed on a calendar-year axis (cells of
+equal width, years aligned across cores) or on a length axis (cells as
+wide as the rings, each bar a scale drawing of the core). Cells are
 shaded by ring width relative to the series itself (darker = narrower), so
 that narrow rings shared by the stand appear as dark vertical stripes and a
 misdated core shows up as a bar whose stripes are offset from its
@@ -130,6 +149,10 @@ rwl <- dpl_read_dec(mir_file, label_length = NULL, stop_val = -9999L,
 
 plot_cof_rings(rwl)
 plot_cof_rings(rwl, sort = "first", tree_fun = function(id) substr(id, 1, 6))
+
+# cores drawn to scale, aligned at the bark, as in TSAP-Win
+plot_cof_rings(rwl, xaxis = "length", sort = "length")
+plot_cof_rings(rwl, xaxis = "length", align = "inner", years = c(1850, 2002))
 plot_cof_rings(rwl, years = c(1850, 2002), palette = "blue",
                mark_years = c(Fire = 1860, 1912))
 
