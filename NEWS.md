@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9004 (development)
+# cofechar 1.0.0.9005 (development)
 
 ## New features
 
@@ -14,6 +14,12 @@
   number of years needed for each level of evidence, and what
   Gleichlaeufigkeit measures, its exact binomial significance and how to
   weigh it against r on short series. `glk_p0` is reported in the summary.
+* `dpl_short_plot()`: bar plot of the master and short series side by side,
+  one row per year, in COFECHA notation. Samples are not ranked over their
+  own few years but expressed on the master's scale (log first differences
+  standardised by the master's window mean and SD), so bars are comparable
+  across columns and pointer years line up. `pool = TRUE` adds the stand
+  mean; `lag` previews a shift suggested by `dpl_short()`.
 * `dpl_cof()` gains `min_length` (default 10): series with fewer measured
   years are excluded from the master and from segment testing, listed in
   Part 1 and returned in `$short`. COFECHA's CRIT99 table starts at 10 years;

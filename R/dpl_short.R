@@ -138,7 +138,9 @@
 #'     series are set aside (\code{cof$short}) and the master is built from
 #'     the cores alone -- essential, otherwise the test is circular.
 #'   \item \code{dpl_short(all, cof, pool = TRUE)}: read the pooled verdict
-#'     first, then the individuals.
+#'     first, then the individuals. \code{\link{dpl_short_plot}(all, cof)}
+#'     shows the same comparison as a bar plot, master and samples side by
+#'     side on the master's scale.
 #'   \item Examine any \code{"shifted"} series and any with low GLK at the
 #'     microscope; correct with \code{\link{dpl_edt}} (insert/delete a ring)
 #'     and re-run.
@@ -216,8 +218,8 @@
 #' dpl_short(dpl_merge(list(cores, micro2)), cof, series = "6143")
 #' }
 #'
-#' @seealso \code{\link{dpl_cof}}, \code{\link{dpl_dateme}},
-#'   \code{\link{dpl_edt}}
+#' @seealso \code{\link{dpl_short_plot}}, \code{\link{dpl_cof}},
+#'   \code{\link{dpl_dateme}}, \code{\link{dpl_edt}}
 #' @export
 dpl_short <- function(rwl, cof_result,
                       series   = NULL,
