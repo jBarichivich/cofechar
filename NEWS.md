@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9008 (development)
+# cofechar 1.0.0.9009 (development)
 
 ## New features
 
@@ -20,6 +20,16 @@
   standardised by the master's window mean and SD), so bars are comparable
   across columns and pointer years line up. `pool = TRUE` adds the stand
   mean; `lag` previews a shift suggested by `dpl_short()`.
+* `dpl_cormat()`: pairwise correlation matrix of all series printed in the
+  COFECHA Part 5 style (lower triangle, F4.2 cells with the leading zero
+  suppressed, `-` below `min_overlap`), with significance asterisks
+  (* 0.05, ** 0.01, *** 0.001; one-sided, n - 2 df on each pair's own
+  overlap) and per-series summary rows (pairs, mean r, number significant)
+  plus the collection rbar. `type = "raw"` uses the measurements,
+  `type = "transformed"` the COFECHA-filtered series.
+* `dpl_cof()` returns `$filtered`: the fully transformed series (spline,
+  log, AR, normalised) as an `rwl` on the master's year axis - the values
+  Part 5 correlates - for `dpl_cormat()` and for the user's own analyses.
 * `dpl_print_pdf()`: print the COFECHA text output (`cof$output`) or any
   ASCII bar plot (`dpl_barplot`, `dpl_short_barplot`) to an A4/Letter PDF
   in a monospaced font. The font size is computed so that the longest line

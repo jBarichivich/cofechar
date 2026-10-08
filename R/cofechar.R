@@ -3123,6 +3123,11 @@ dpl_edit_file <- function(path,
 #' \describe{
 #'   \item{`$short`}{`data.frame` (`series`, `jyr`, `lyr`, `n`) of series
 #'     excluded as shorter than `min_length` (empty if none).}
+#'   \item{`$filtered`}{`rwl` data.frame of the fully transformed series
+#'     (spline-detrended, log-transformed, AR-prewhitened, normalised) on the
+#'     master's year axis: the values COFECHA correlates in Part 5. Use with
+#'     \code{\link{dpl_cormat}} or your own analyses of the year-to-year
+#'     signal.}
 #'   \item{`$master`}{Named numeric vector. Globally normalised master dating
 #'     series (names = character years). Used for Part 3/4 output and plotting.}
 #'   \item{`$master_raw`}{Named numeric vector. Pre-normalisation mean of
@@ -3925,8 +3930,22 @@ dpl_cof <- function(rwl,
     writeLines(out_lines, output_file)
 
   # ---- Return --------------------------------------------------------------
+  # ---- Filtered series as an rwl (what Part 5 correlates: spline, log, AR,
+  # normalised, i.e. ZSERM) on the master's year axis ------------------------
+  filt <- as.data.frame(matrix(NA_real_, length(master_yrs), 0L,
+                               dimnames = list(master_yrs, NULL)))
+  for (seq_no in seq_len(nser_tot)) {
+    s <- ser_store[[seq_no]]
+    if (is.null(s)) next
+    col <- rep(NA_real_, length(master_yrs))
+    col[match(as.character(s$jyr:s$lyr), master_yrs)] <- s$z_ar_norm
+    filt[[s$id]] <- col
+  }
+  class(filt) <- c("rwl", "data.frame")
+
   result <- list(
     short        = short_df,      # series excluded as shorter than min_length
+    filtered     = filt,          # COFECHA-transformed series (Part 5 input)
     master       = master_norm,   # globally normalised master (for plotting, Part 3/4)
     master_raw   = master,        # raw mean of z_norm per series (pre global normts)
     sample_depth = depth,

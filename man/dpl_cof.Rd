@@ -71,6 +71,11 @@ A named list:
 \describe{
   \item{`$short`}{`data.frame` (`series`, `jyr`, `lyr`, `n`) of series
     excluded as shorter than `min_length` (empty if none).}
+  \item{`$filtered`}{`rwl` data.frame of the fully transformed series
+    (spline-detrended, log-transformed, AR-prewhitened, normalised) on the
+    master's year axis: the values COFECHA correlates in Part 5. Use with
+    \code{\link{dpl_cormat}} or your own analyses of the year-to-year
+    signal.}
   \item{`$master`}{Named numeric vector. Globally normalised master dating
     series (names = character years). Used for Part 3/4 output and plotting.}
   \item{`$master_raw`}{Named numeric vector. Pre-normalisation mean of

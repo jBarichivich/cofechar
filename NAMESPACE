@@ -3,6 +3,7 @@
 export(dpl_barplot)
 export(dpl_cof)
 export(dpl_cof_diag)
+export(dpl_cormat)
 export(dpl_dateme)
 export(dpl_display)
 export(dpl_edit_file)
