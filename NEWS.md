@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9001 (development)
+# cofechar 1.0.0.9002 (development)
 
 ## New features
 
