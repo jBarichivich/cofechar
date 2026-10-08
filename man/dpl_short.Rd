@@ -185,11 +185,11 @@ shared error would be pooled too.
 \subsection{Workflow}{
 \enumerate{
   \item Read cores and short series, merge them, run
-    \code{dpl_cof(all)}. With the default \code{min_length = 10} the short
+    \code{dpl_cof(rwl_all)}. With the default \code{min_length = 10} the short
     series are set aside (\code{cof$short}) and the master is built from
     the cores alone -- essential, otherwise the test is circular.
-  \item \code{dpl_short(all, cof, pool = TRUE)}: read the pooled verdict
-    first, then the individuals. \code{\link{dpl_short_plot}(all, cof)}
+  \item \code{dpl_short(rwl_all, cof, pool = TRUE)}: read the pooled verdict
+    first, then the individuals. \code{\link{dpl_short_barplot}(rwl_all, cof)}
     shows the same comparison as a bar plot, master and samples side by
     side on the master's scale.
   \item Examine any \code{"shifted"} series and any with low GLK at the
@@ -215,15 +215,16 @@ error.
 }
 \examples{
 \dontrun{
-cores <- dpl_read_dec("MAI.rwl")
-micro <- dpl_read_dec("MAI_xylo.rwl")          # 3- to 13-year microcores
-all   <- dpl_merge(list(cores, micro))
-cof   <- dpl_cof(all)                          # min_length = 10 sets the
+cores   <- dpl_read_dec("MAI.rwl")
+micro   <- dpl_read_dec("MAI_xylo.rwl")        # 3- to 13-year microcores
+rwl_all <- dpl_merge(list(cores, micro))
+cof     <- dpl_cof(rwl_all)                    # min_length = 10 sets the
 cof$short                                      #   short ones aside
 
-chk <- dpl_short(all, cof, pool = TRUE)
+chk <- dpl_short(rwl_all, cof, pool = TRUE)
 chk$summary                                    # POOL row first, then each
 subset(chk$lags, series == "POOL")             # pooled lag table
+dpl_short_barplot(rwl_all, cof)                # the same, as a bar plot
 
 # a series flagged "shifted" by -1: one ring too many near the bark;
 # inspect the sample, then e.g. delete the suspect ring and re-check
@@ -239,6 +240,6 @@ dendrochronologischen Verfahrens und zur Analyse seiner Aussagesicherheit.
 \emph{Forstwissenschaftliches Centralblatt} 88:230--250.
 }
 \seealso{
-\code{\link{dpl_short_plot}}, \code{\link{dpl_cof}},
+\code{\link{dpl_short_barplot}}, \code{\link{dpl_cof}},
   \code{\link{dpl_dateme}}, \code{\link{dpl_edt}}
 }

@@ -1,6 +1,6 @@
 
 # =============================================================================
-# dpl_short_plot  --  bar plot of short series side by side with the master
+# dpl_short_barplot  --  bar plot of short series side by side with the master
 # =============================================================================
 
 #' Bar plot of short series beside the COFECHA master
@@ -54,17 +54,17 @@
 #'
 #' @examples
 #' \dontrun{
-#' cof <- dpl_cof(all)                      # short series set aside
-#' dpl_short(all, cof, pool = TRUE)         # the numbers
-#' dpl_short_plot(all, cof)                 # the picture
+#' cof <- dpl_cof(rwl_all)                      # short series set aside
+#' dpl_short(rwl_all, cof, pool = TRUE)         # the numbers
+#' dpl_short_barplot(rwl_all, cof)              # the picture
 #'
 #' # what would 6143 look like shifted back one year?
-#' dpl_short_plot(all, cof, series = c("6143", "6144"), lag = c("6143" = -1))
+#' dpl_short_barplot(rwl_all, cof, series = c("6143", "6144"), lag = c("6143" = -1))
 #' }
 #'
 #' @seealso \code{\link{dpl_short}}, \code{\link{dpl_barplot}}
 #' @export
-dpl_short_plot <- function(rwl, cof_result,
+dpl_short_barplot <- function(rwl, cof_result,
                            series      = NULL,
                            years       = NULL,
                            margin      = 3L,

@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9005 (development)
+# cofechar 1.0.0.9006 (development)
 
 ## New features
 
@@ -14,7 +14,7 @@
   number of years needed for each level of evidence, and what
   Gleichlaeufigkeit measures, its exact binomial significance and how to
   weigh it against r on short series. `glk_p0` is reported in the summary.
-* `dpl_short_plot()`: bar plot of the master and short series side by side,
+* `dpl_short_barplot()`: bar plot of the master and short series side by side,
   one row per year, in COFECHA notation. Samples are not ranked over their
   own few years but expressed on the master's scale (log first differences
   standardised by the master's window mean and SD), so bars are comparable

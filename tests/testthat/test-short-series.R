@@ -122,7 +122,7 @@ test_that("dpl_cof runs when the last series in the collection are set aside", {
   expect_true(any(grepl("^PART 7", cof$output)))
 })
 
-test_that("dpl_short_plot prints master and samples on the master's scale", {
+test_that("dpl_short_barplot prints master and samples on the master's scale", {
   set.seed(5)
   sig <- cumsum(rnorm(60)); sig <- abs(sig / max(abs(sig)) * 2) + 0.5
   rwl <- mk_rwl(1950:2009,
@@ -132,7 +132,7 @@ test_that("dpl_short_plot prints master and samples on the master's scale", {
                 S1 = ser(sig[54:60], offset = 53L),
                 S2 = ser(sig[56:60], offset = 55L))
   cof <- dpl_cof(rwl, verbose = FALSE, parts = integer(0))
-  out <- dpl_short_plot(rwl, cof, quiet = TRUE)
+  out <- dpl_short_barplot(rwl, cof, quiet = TRUE)
   expect_true(any(grepl("MASTER", out)))
   expect_true(any(grepl("POOL", out)))
   expect_true(any(grepl("^2009  ", out)))
@@ -140,13 +140,13 @@ test_that("dpl_short_plot prints master and samples on the master's scale", {
   r2003 <- out[grepl("^2003  ", out)]
   expect_true(nchar(r2003) < 6 + 2 * 12 + 1)
   # lag shifts the column
-  out2 <- dpl_short_plot(rwl, cof, series = "S2", pool = FALSE,
+  out2 <- dpl_short_barplot(rwl, cof, series = "S2", pool = FALSE,
                          lag = c(S2 = -1), quiet = TRUE)
   expect_true(any(grepl("2004-2008", out2)))
   # explicit window
-  out3 <- dpl_short_plot(rwl, cof, years = c(2000, 2009), quiet = TRUE)
+  out3 <- dpl_short_barplot(rwl, cof, years = c(2000, 2009), quiet = TRUE)
   expect_false(any(grepl("^1999  ", out3)))
   # file output
-  f <- tempfile(); dpl_short_plot(rwl, cof, quiet = TRUE, output_file = f)
+  f <- tempfile(); dpl_short_barplot(rwl, cof, quiet = TRUE, output_file = f)
   expect_equal(readLines(f), out)
 })
