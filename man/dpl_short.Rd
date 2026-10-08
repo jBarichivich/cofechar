@@ -46,7 +46,8 @@ Invisibly, a list with:
   \item{\code{summary}}{One row per series (plus \code{"POOL"} if
     requested): \code{series}, \code{jyr}, \code{lyr}, \code{n} (measured
     years; for the pool, years covered), \code{r0}, \code{p0},
-    \code{glk0}, \code{best_lag}, \code{r_best}, \code{verdict}.}
+    \code{glk0}, \code{glk_p0}, \code{best_lag}, \code{r_best},
+    \code{verdict}.}
   \item{\code{lags}}{One row per series and lag: \code{series}, \code{lag},
     \code{n} (differences), \code{r}, \code{p}, \code{glk}, \code{glk_p}.}
   \item{\code{pool}}{When \code{pool = TRUE}: the pooled log-difference
@@ -97,10 +98,36 @@ overlapping differences give:
     defensible.}
   \item{\code{glk}}{Gleichl\enc{ä}{ae}ufigkeit (Eckstein & Bauch 1969): the
     proportion of year-to-year changes with the same sign in series and
-    master, with its exact binomial p-value \code{glk_p}. GLK is the
-    statistic behind the German-school (TSAP) dating practice and is
-    robust to single extreme rings.}
+    master, with its exact binomial p-value \code{glk_p} (see the GLK
+    section below).}
 }
+}
+
+\subsection{Gleichl\enc{ä}{ae}ufigkeit (GLK)}{
+GLK asks one question of every pair of consecutive years: did the series
+and the master change in the same direction? It is the fraction of years
+where they did, ignoring by how much. This is what a dendrochronologist
+does by eye on a skeleton plot, and it is the dating statistic of the
+German school (TSAP, CDendro).
+
+Its significance is exact at any length: if the series were unrelated to
+the master, each year's agreement would be a coin toss, so with \eqn{n}
+differences and \eqn{k} agreements the one-sided p-value (\code{glk_p})
+is the binomial tail \eqn{P(X \ge k \mid n, 1/2)}. Perfect agreement
+gives \eqn{p = 0.5^n}: 0.125 for 3 differences, 0.06 for 4, 0.03 for 5,
+0.008 for 7, 0.001 for 10. One disagreement roughly quadruples these.
+
+For 4--6 years GLK is the statistic to trust: its p-value needs no
+distributional assumption, whereas the t-test behind \code{p} for
+\code{r} does, and it cannot be dragged by one extreme ring (a partly
+sampled first or last ring is common in microcores). Its weakness is the
+reverse: it discards the magnitudes, so when the signal is real it has
+less power than \code{r}, small changes count as much as pointer years,
+and on long series it rarely exceeds 0.75 even when dating is certain
+(0.60--0.65 is the usual working threshold at \eqn{n \ge 50}). Read
+both: when \code{r} and GLK agree the dating is as secure as a short
+series allows; when they diverge, the better-looking one is probably
+being carried by a single large ring.
 }
 
 \subsection{Reading the verdict}{

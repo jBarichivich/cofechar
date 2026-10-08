@@ -1,5 +1,5 @@
 
-# cofechar 1.0.0.9003 (development)
+# cofechar 1.0.0.9004 (development)
 
 ## New features
 
@@ -11,7 +11,9 @@
   `pool = TRUE` also tests the mean log-difference series of all short
   series from the stand, which can be tested even when the individual
   series are too short. The help page documents the workflow and the
-  number of years needed for each level of evidence.
+  number of years needed for each level of evidence, and what
+  Gleichlaeufigkeit measures, its exact binomial significance and how to
+  weigh it against r on short series. `glk_p0` is reported in the summary.
 * `dpl_cof()` gains `min_length` (default 10): series with fewer measured
   years are excluded from the master and from segment testing, listed in
   Part 1 and returned in `$short`. COFECHA's CRIT99 table starts at 10 years;

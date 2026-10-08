@@ -47,10 +47,36 @@
 #'     defensible.}
 #'   \item{\code{glk}}{Gleichl\enc{ä}{ae}ufigkeit (Eckstein & Bauch 1969): the
 #'     proportion of year-to-year changes with the same sign in series and
-#'     master, with its exact binomial p-value \code{glk_p}. GLK is the
-#'     statistic behind the German-school (TSAP) dating practice and is
-#'     robust to single extreme rings.}
+#'     master, with its exact binomial p-value \code{glk_p} (see the GLK
+#'     section below).}
 #' }
+#' }
+#'
+#' \subsection{Gleichl\enc{ä}{ae}ufigkeit (GLK)}{
+#' GLK asks one question of every pair of consecutive years: did the series
+#' and the master change in the same direction? It is the fraction of years
+#' where they did, ignoring by how much. This is what a dendrochronologist
+#' does by eye on a skeleton plot, and it is the dating statistic of the
+#' German school (TSAP, CDendro).
+#'
+#' Its significance is exact at any length: if the series were unrelated to
+#' the master, each year's agreement would be a coin toss, so with \eqn{n}
+#' differences and \eqn{k} agreements the one-sided p-value (\code{glk_p})
+#' is the binomial tail \eqn{P(X \ge k \mid n, 1/2)}. Perfect agreement
+#' gives \eqn{p = 0.5^n}: 0.125 for 3 differences, 0.06 for 4, 0.03 for 5,
+#' 0.008 for 7, 0.001 for 10. One disagreement roughly quadruples these.
+#'
+#' For 4--6 years GLK is the statistic to trust: its p-value needs no
+#' distributional assumption, whereas the t-test behind \code{p} for
+#' \code{r} does, and it cannot be dragged by one extreme ring (a partly
+#' sampled first or last ring is common in microcores). Its weakness is the
+#' reverse: it discards the magnitudes, so when the signal is real it has
+#' less power than \code{r}, small changes count as much as pointer years,
+#' and on long series it rarely exceeds 0.75 even when dating is certain
+#' (0.60--0.65 is the usual working threshold at \eqn{n \ge 50}). Read
+#' both: when \code{r} and GLK agree the dating is as secure as a short
+#' series allows; when they diverge, the better-looking one is probably
+#' being carried by a single large ring.
 #' }
 #'
 #' \subsection{Reading the verdict}{
@@ -156,7 +182,8 @@
 #'   \item{\code{summary}}{One row per series (plus \code{"POOL"} if
 #'     requested): \code{series}, \code{jyr}, \code{lyr}, \code{n} (measured
 #'     years; for the pool, years covered), \code{r0}, \code{p0},
-#'     \code{glk0}, \code{best_lag}, \code{r_best}, \code{verdict}.}
+#'     \code{glk0}, \code{glk_p0}, \code{best_lag}, \code{r_best},
+#'     \code{verdict}.}
 #'   \item{\code{lags}}{One row per series and lag: \code{series}, \code{lag},
 #'     \code{n} (differences), \code{r}, \code{p}, \code{glk}, \code{glk_p}.}
 #'   \item{\code{pool}}{When \code{pool = TRUE}: the pooled log-difference
@@ -283,7 +310,8 @@ dpl_short <- function(rwl, cof_result,
     tab <- do.call(rbind, tab)
     lag_rows[[sid]] <- tab
 
-    r0 <- tab$r[tab$lag == 0L]; p0 <- tab$p[tab$lag == 0L]; g0 <- tab$glk[tab$lag == 0L]
+    r0 <- tab$r[tab$lag == 0L]; p0 <- tab$p[tab$lag == 0L]
+    g0 <- tab$glk[tab$lag == 0L]; gp0 <- tab$glk_p[tab$lag == 0L]
     ib <- if (all(is.na(tab$r))) NA_integer_ else which.max(tab$r)
     blag <- if (is.na(ib)) NA_integer_ else tab$lag[ib]
     rb   <- if (is.na(ib)) NA_real_ else tab$r[ib]
@@ -296,7 +324,7 @@ dpl_short <- function(rwl, cof_result,
     sp <- spans[[sid]]
     sum_rows[[sid]] <- data.frame(
       series = sid, jyr = sp[1L], lyr = sp[2L], n = sp[3L],
-      r0 = r0, p0 = p0, glk0 = g0, best_lag = blag, r_best = rb,
+      r0 = r0, p0 = p0, glk0 = g0, glk_p0 = gp0, best_lag = blag, r_best = rb,
       verdict = verdict, stringsAsFactors = FALSE)
   }
 
@@ -306,17 +334,18 @@ dpl_short <- function(rwl, cof_result,
   # ---- console report -------------------------------------------------------
   cat(sprintf("\n Anchored check of %d short series against the master (lags %+d..%+d)\n",
               sum(summary$series != "POOL"), -max_lag, max_lag))
-  cat(sprintf(" %-8s %4s-%-4s %3s  %6s %6s %5s   %4s %6s   %s\n",
-              "Series", "from", "to", "n", "r(0)", "p(0)", "GLK", "best", "r", "verdict"))
+  cat(sprintf(" %-8s %4s-%-4s %3s  %6s %6s %5s %6s   %4s %6s   %s\n",
+              "Series", "from", "to", "n", "r(0)", "p(0)", "GLK", "p", "best", "r", "verdict"))
   fmt <- function(v, f, na = "     -") if (is.na(v)) na else sprintf(f, v)
   for (k in seq_len(nrow(summary))) {
     z <- summary[k, ]
-    cat(sprintf(" %-8s %4d-%-4d %3d  %6s %6s %5s   %4s %6s   %s\n",
+    cat(sprintf(" %-8s %4d-%-4d %3d  %6s %6s %5s %6s   %4s %6s   %s\n",
                 z$series, z$jyr, z$lyr, z$n,
                 fmt(z$r0, "%6.2f"), fmt(z$p0, "%6.3f"), fmt(z$glk0, "%5.2f", "    -"),
+                fmt(z$glk_p0, "%6.3f"),
                 fmt(z$best_lag, "%+4d", "   -"), fmt(z$r_best, "%6.2f"), z$verdict))
     if (z$series == "POOL" && nrow(summary) > 1L)
-      cat(sprintf(" %s\n", strrep("-", 72L)))
+      cat(sprintf(" %s\n", strrep("-", 79L)))
   }
   if (!is.null(pool_out))
     cat(sprintf("\n POOL: mean log-difference of %d series, %d years with >= %d series\n",
