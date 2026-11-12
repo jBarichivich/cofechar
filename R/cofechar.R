@@ -705,21 +705,32 @@ dpl_write <- function(x, path, format = "compact") {
 #'   so a single value also covers files with shorter IDs. Supply it only when
 #'   auto-detection fails, e.g. a label that itself ends in digits or a dash
 #'   and digits; leave `NULL` otherwise.
-#' @param stop_val Integer (default `999L`). End-of-series sentinel.
-#'   Set `NULL` to import all values as-is.
+#' @param stop_val Integer vector (default \code{c(999L, -9999L)}). Stop codes
+#'   that may end a series. A stop code is taken as the terminator only when
+#'   it is the \emph{last} value of its series; anywhere else it is data (in
+#'   a 1/1000 mm series, 999 is a ring of 0.999 mm). Under \code{unit =
+#'   "auto"} the terminator also sets the unit of its series (see
+#'   \code{unit}). Set `NULL` to import all values as they are.
 #' @param na_val Integer vector (default `c(-999L, -9999L)`). Values that mark
 #'   a missing measurement \emph{within} a series (the year is kept, the value
 #'   becomes `NA`); typical of files exported from measuring software for
-#'   series with gaps, e.g. microcores not sampled in some years. Values equal
-#'   to `stop_val` are always treated as end of series first. Set `NULL` to
-#'   disable.
-#' @param unit Character: \code{"auto"} (default), \code{"0.001mm"}, \code{"0.01mm"}, or
-#'   \code{"mm"}. Under \code{"auto"}, two signals are combined: a negative `stop_val`
-#'   (e.g. `-9999`) with median raw value > 20 implies 1/1000 mm (scale
-#'   0.001); a positive or absent sentinel with median > 20 implies 1/100 mm
-#'   (scale 0.01); otherwise values are taken as already in mm. The negative
-#'   sentinel is the reliable marker of Holmes 1/1000 mm encoding, where
-#'   `-9999` represents -9.999 mm.
+#'   series with gaps, e.g. microcores not sampled in some years. The last
+#'   value of a series is checked against `stop_val` first, so \code{-9999}
+#'   ends a series when it comes last and marks a missing ring anywhere
+#'   else. Set `NULL` to disable.
+#' @param unit Character: \code{"auto"} (default), \code{"0.001mm"},
+#'   \code{"0.01mm"}, or \code{"mm"}. Under \code{"auto"} each series is
+#'   scaled by its own terminator, following the Tucson convention: a series
+#'   ending in a positive stop code (999) is in 1/100 mm, one ending in a
+#'   negative stop code (-9999) in 1/1000 mm, so files that mix the two are
+#'   read correctly. Series without a terminator take the unit shared by the
+#'   terminated series of the file; if no series is terminated, integer
+#'   values with median > 20 are taken as 1/100 mm (1/1000 mm when every stop
+#'   code given is negative) and anything smaller as mm. A fixed unit applies
+#'   to every series, with a warning naming series whose terminator implies
+#'   the other unit; \code{"mm"} takes values as they are. The unit used for
+#'   each series is returned in \code{attr(x, "units")} and printed when a
+#'   file mixes units.
 #' @param skip_lines Integer (default `0L`) or \code{"auto"}. Number of header
 #'   lines to skip. \code{"auto"} skips leading lines that do not start with a
 #'   label+year token.
@@ -731,7 +742,8 @@ dpl_write <- function(x, path, format = "compact") {
 #'   are always literal.
 #'
 #' @return A `c("rwl","data.frame")` with integer row names (calendar years),
-#'   one column per series (values in mm, `NA` for absent/missing rings).
+#'   one column per series (values in mm, `NA` for absent/missing rings),
+#'   and attribute \code{"units"}: the unit each series was read in.
 #'   A one-line summary is printed to the console. Compatible with all dplR
 #'   and cofechar functions.
 #'
@@ -755,7 +767,7 @@ dpl_write <- function(x, path, format = "compact") {
 #' @export
 dpl_read_dec <- function(file,
                            label_length = NULL,
-                           stop_val     = 999L,
+                           stop_val     = c(999L, -9999L),
                            na_val       = c(-999L, -9999L),
                            unit         = c("auto", "0.001mm", "0.01mm", "mm"),
                            skip_lines   = 0L,
@@ -898,59 +910,83 @@ dpl_read_dec <- function(file,
     yr_ints[rel] <- as.integer(base_century) + yr_ints[rel]
   }
 
+  # Raw integers per series, keyed by year, sentinels included: whether a
+  # stop code ends a series (and so sets its unit) can only be decided once
+  # the whole series has been read.
   data_store <- list()
   for (ri in seq_along(recs)) {
     sid       <- recs[[ri]]$sid
     val_strs  <- recs[[ri]]$vals
     decade_yr <- yr_ints[ri]
-    if (!(sid %in% names(data_store))) data_store[[sid]] <- numeric(0)
-
+    if (!(sid %in% names(data_store))) data_store[[sid]] <- integer(0)
     for (i in seq_along(val_strs)) {
       v_int <- suppressWarnings(as.integer(val_strs[i]))
       if (is.na(v_int)) next
-      yr <- decade_yr + (i - 1L)
-      if (!is.null(stop_val) && v_int == as.integer(stop_val)) break
-      if (!is.null(na_val) && v_int %in% as.integer(na_val)) v_int <- NA_integer_
-      data_store[[sid]][as.character(yr)] <- v_int
+      data_store[[sid]][as.character(decade_yr + (i - 1L))] <- v_int
     }
   }
 
   if (length(data_store) == 0L) stop("No series data found in file.")
 
-  # ---- 4. Unit conversion ---------------------------------------------------
-  # Collect all non-NA raw values to decide conversion
-  all_raw <- unlist(lapply(data_store, as.numeric), use.names = FALSE)
-  all_raw <- all_raw[!is.na(all_raw)]
-
-  # Three-way auto-detection:
-  #   negative stop_val (e.g. -9999) AND median > 20  ->  0.001 mm
-  #     A negative end-of-series sentinel is the signature of Holmes
-  #     1/1000 mm integer encoding (-9999 = -9.999 mm in that scale).
-  #     Standard Tucson encoding uses a positive sentinel (999 or 9990).
-  #   median > 20 (positive or NULL stop_val)          ->  0.01 mm
-  #     Standard Tucson integer encoding (9999 ~ 99.99 mm acts as flag).
-  #   otherwise                                         ->  mm
-  scale <- switch(unit,
-    "0.001mm" = 0.001,
-    "0.01mm"  = 0.01,
-    "mm"      = 1.0,
-    "auto"    = {
-      if (length(all_raw) == 0L) {
-        1.0
-      } else {
-        med      <- stats::median(all_raw, na.rm = TRUE)
-        neg_sent <- !is.null(stop_val) && as.integer(stop_val) < 0L
-        if      (neg_sent && med > 20) 0.001
-        else if (med > 20)             0.01
-        else                           1.0
-      }
-    }
-  )
-
-  # Convert each series to mm
+  # ---- 4. Terminators, missing values and units, series by series ---------
+  # Tucson convention: a series in 1/100 mm ends with 999, a series in
+  # 1/1000 mm ends with -9999, and one file may mix both. The terminator of
+  # each series is its LAST value, if that value is a stop code; it sets the
+  # unit of that series under unit = "auto". A stop code anywhere else is
+  # data (999 is a 0.999 mm ring at 1/1000 mm) unless it is listed in na_val.
+  stop_codes <- if (is.null(stop_val)) integer(0) else as.integer(stop_val)
+  na_codes   <- if (is.null(na_val))   integer(0) else as.integer(na_val)
+  term <- setNames(rep(NA_integer_, length(data_store)), names(data_store))
   for (sid in names(data_store)) {
     v <- data_store[[sid]]
-    data_store[[sid]] <- setNames(as.numeric(v) * scale, names(v))
+    v <- v[order(as.integer(names(v)))]
+    n <- length(v)
+    if (n && v[n] %in% stop_codes) { term[sid] <- v[n]; v <- v[-n] }
+    v[v %in% na_codes] <- NA_integer_
+    data_store[[sid]] <- v
+  }
+  data_store <- data_store[vapply(data_store, length, integer(1)) > 0L]
+  term <- term[names(data_store)]
+  if (length(data_store) == 0L) stop("No series data found in file.")
+
+  unit_of_term <- function(t) ifelse(is.na(t), NA_real_, ifelse(t < 0L, 0.001, 0.01))
+  implied <- unit_of_term(term)                    # per series, NA if unterminated
+
+  scale <- if (unit == "auto") {
+    # Series without a terminator: the unit shared by the terminated series
+    # of the file when there is one; otherwise the magnitude rule (integer
+    # widths with median > 20 are 1/100 mm, 1/1000 mm if every stop code
+    # given is negative; anything smaller is taken as mm already).
+    fallback <- {
+      known <- implied[!is.na(implied)]
+      if (length(known)) as.numeric(names(which.max(table(known))))
+      else {
+        all_raw <- unlist(lapply(data_store, as.numeric), use.names = FALSE)
+        med <- if (any(!is.na(all_raw))) stats::median(all_raw, na.rm = TRUE) else 0
+        neg <- length(stop_codes) > 0L && all(stop_codes < 0L)
+        if (neg && med > 20) 0.001 else if (med > 20) 0.01 else 1.0
+      }
+    }
+    ifelse(is.na(implied), fallback, implied)
+  } else {
+    fixed <- switch(unit, "0.001mm" = 0.001, "0.01mm" = 0.01, "mm" = 1.0)
+    # "mm" means values are taken as they are: no terminator can contradict it
+    clash <- if (fixed == 1) character(0)
+             else names(implied)[!is.na(implied) & implied != fixed]
+    if (length(clash))
+      warning(sprintf(paste0(
+        "unit = \"%s\" applied to all series, but the terminator of %d series ",
+        "implies another unit (%s). Use unit = \"auto\" to scale each series ",
+        "by its own terminator (999 = 0.01 mm, -9999 = 0.001 mm)."),
+        unit, length(clash), paste(utils::head(clash, 8), collapse = ", ")),
+        call. = FALSE)
+    rep(fixed, length(data_store))
+  }
+  names(scale) <- names(data_store)
+
+  for (sid in names(data_store)) {
+    v <- data_store[[sid]]
+    data_store[[sid]] <- setNames(as.numeric(v) * scale[[sid]], names(v))
   }
 
   # ---- 5. Build rwl data.frame ----------------------------------------------
@@ -974,13 +1010,23 @@ dpl_read_dec <- function(file,
   # Attach dplR-compatible class and attributes
   class(rwl) <- c("rwl", "data.frame")
   attr(rwl, "series.ids") <- names(data_store)
+  attr(rwl, "units")      <- c(`0.001` = "0.001mm", `0.01` = "0.01mm",
+                               `1` = "mm")[as.character(scale)]
+  names(attr(rwl, "units")) <- names(data_store)
 
-  # Print a compact summary (matching dplR's read.rwl() style)
+  # Print a compact summary (matching dplR's read.rwl() style), with the
+  # units when the file mixes them
   n_ser <- ncol(rwl)
   cat(sprintf(
     "Read %d series spanning %d to %d (%d years)\n",
     n_ser, min(all_yrs), max(all_yrs), length(all_yrs)
   ))
+  if (length(unique(scale)) > 1L) {
+    u <- attr(rwl, "units")
+    for (k in unique(u))
+      cat(sprintf("  %-7s %d series: %s\n", k, sum(u == k),
+                  paste(utils::head(names(u)[u == k], 10), collapse = " ")))
+  }
 
   invisible(rwl)
 }
@@ -5092,6 +5138,9 @@ dpl_barplot <- function(rwl,
 #'   a title from the master span.
 #' @param ... Additional arguments passed to \code{\link[graphics]{barplot}}.
 #'
+#' @details The plot occupies one panel, so it can be combined with other
+#' plots through \code{par(mfrow = ...)} or \code{\link[graphics]{layout}}.
+#'
 #' @return Invisibly returns the normalised master series plotted.
 #'
 #' @examples
@@ -5135,30 +5184,34 @@ plot_cof_barplot <- function(cof_result,
 
   cols <- ifelse(y >= 0, col_pos, col_neg)
   ttl  <- if (!is.null(main)) main else
-    sprintf("Master Dating Series  %d \u2013 %d", min(yrs), max(yrs))
+    sprintf("Master Dating Series  %d-%d", min(yrs), max(yrs))
 
-  if (add_sample_depth && !is.null(cof_result$sample_depth)) {
-    nd  <- as.integer(cof_result$sample_depth)
-    op  <- graphics::par(no.readonly = TRUE)
+  # Only the margins are changed and restored: saving and restoring the whole
+  # par() state would also rewind mfg/fig and break par(mfrow) or layout()
+  # figures, where the next plot must go to the next panel.
+  has_depth <- add_sample_depth && !is.null(cof_result$sample_depth)
+  if (has_depth) {
+    nd <- as.integer(cof_result$sample_depth)
+    op <- graphics::par(mar = c(4, 4, 3, 4))
     on.exit(graphics::par(op), add = TRUE)
-    graphics::par(mar = c(4, 4, 3, 4))
   }
 
-  graphics::barplot(y, names.arg = yrs, col = cols, border = NA,
-                    ylab = "Normalised index", xlab = "Year",
-                    main = ttl, las = 2L, ...)
+  mid <- graphics::barplot(y, names.arg = yrs, col = cols, border = NA,
+                           ylab = "Normalised index", xlab = "Year",
+                           main = ttl, las = 2L, ...)
   graphics::abline(h = 0, col = "black", lwd = 0.5)
 
-  if (add_sample_depth && !is.null(cof_result$sample_depth)) {
-    nd_sc <- nd / max(nd) * graphics::par("usr")[4L] * 0.35
-    graphics::par(new = TRUE)
-    graphics::plot(yrs, nd_sc, type = "l", col = "grey50", lwd = 1.5,
-                   axes = FALSE, xlab = "", ylab = "",
-                   ylim = c(0, graphics::par("usr")[4L]))
-    graphics::axis(4, at = pretty(nd_sc),
-                   labels = round(pretty(nd_sc) / graphics::par("usr")[4L]
-                                  * max(nd) / 0.35),
-                   col.axis = "grey50", col = "grey50", las = 1L)
+  if (has_depth) {
+    # Drawn in the bar plot's own coordinates (bar midpoints on x), scaled to
+    # the upper 35% of the y range, with its own axis on the right. A second
+    # plot() on a year axis would not line up with the bars.
+    top   <- graphics::par("usr")[4L]
+    sc    <- 0.35 * top / max(nd)
+    graphics::lines(as.numeric(mid), nd * sc, col = "grey50", lwd = 1.5)
+    at_n  <- pretty(c(0, max(nd)), n = 3)
+    at_n  <- at_n[at_n <= max(nd)]
+    graphics::axis(4, at = at_n * sc, labels = at_n, col.axis = "grey50",
+                   col = "grey50", las = 1L)
     graphics::mtext("Sample depth (n series)", side = 4L, line = 2.5,
                     col = "grey50", cex = 0.85)
   }

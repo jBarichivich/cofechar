@@ -7,7 +7,7 @@
 dpl_read_dec(
   file,
   label_length = NULL,
-  stop_val = 999L,
+  stop_val = c(999L, -9999L),
   na_val = c(-999L, -9999L),
   unit = c("auto", "0.001mm", "0.01mm", "mm"),
   skip_lines = 0L,
@@ -26,23 +26,34 @@ so a single value also covers files with shorter IDs. Supply it only when
 auto-detection fails, e.g. a label that itself ends in digits or a dash
 and digits; leave `NULL` otherwise.}
 
-\item{stop_val}{Integer (default `999L`). End-of-series sentinel.
-Set `NULL` to import all values as-is.}
+\item{stop_val}{Integer vector (default \code{c(999L, -9999L)}). Stop codes
+that may end a series. A stop code is taken as the terminator only when
+it is the \emph{last} value of its series; anywhere else it is data (in
+a 1/1000 mm series, 999 is a ring of 0.999 mm). Under \code{unit =
+"auto"} the terminator also sets the unit of its series (see
+\code{unit}). Set `NULL` to import all values as they are.}
 
 \item{na_val}{Integer vector (default `c(-999L, -9999L)`). Values that mark
 a missing measurement \emph{within} a series (the year is kept, the value
 becomes `NA`); typical of files exported from measuring software for
-series with gaps, e.g. microcores not sampled in some years. Values equal
-to `stop_val` are always treated as end of series first. Set `NULL` to
-disable.}
+series with gaps, e.g. microcores not sampled in some years. The last
+value of a series is checked against `stop_val` first, so \code{-9999}
+ends a series when it comes last and marks a missing ring anywhere
+else. Set `NULL` to disable.}
 
-\item{unit}{Character: \code{"auto"} (default), \code{"0.001mm"}, \code{"0.01mm"}, or
-\code{"mm"}. Under \code{"auto"}, two signals are combined: a negative `stop_val`
-(e.g. `-9999`) with median raw value > 20 implies 1/1000 mm (scale
-0.001); a positive or absent sentinel with median > 20 implies 1/100 mm
-(scale 0.01); otherwise values are taken as already in mm. The negative
-sentinel is the reliable marker of Holmes 1/1000 mm encoding, where
-`-9999` represents -9.999 mm.}
+\item{unit}{Character: \code{"auto"} (default), \code{"0.001mm"},
+\code{"0.01mm"}, or \code{"mm"}. Under \code{"auto"} each series is
+scaled by its own terminator, following the Tucson convention: a series
+ending in a positive stop code (999) is in 1/100 mm, one ending in a
+negative stop code (-9999) in 1/1000 mm, so files that mix the two are
+read correctly. Series without a terminator take the unit shared by the
+terminated series of the file; if no series is terminated, integer
+values with median > 20 are taken as 1/100 mm (1/1000 mm when every stop
+code given is negative) and anything smaller as mm. A fixed unit applies
+to every series, with a warning naming series whose terminator implies
+the other unit; \code{"mm"} takes values as they are. The unit used for
+each series is returned in \code{attr(x, "units")} and printed when a
+file mixes units.}
 
 \item{skip_lines}{Integer (default `0L`) or \code{"auto"}. Number of header
 lines to skip. \code{"auto"} skips leading lines that do not start with a
@@ -57,7 +68,8 @@ are always literal.}
 }
 \value{
 A `c("rwl","data.frame")` with integer row names (calendar years),
-  one column per series (values in mm, `NA` for absent/missing rings).
+  one column per series (values in mm, `NA` for absent/missing rings),
+  and attribute \code{"units"}: the unit each series was read in.
   A one-line summary is printed to the console. Compatible with all dplR
   and cofechar functions.
 }

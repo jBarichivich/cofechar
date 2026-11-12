@@ -41,6 +41,10 @@ sample depth as a grey line. The layout mirrors the information content of
 Holmes' Part 4 ASCII bar plot but is designed for screen display and
 publication export.
 }
+\details{
+The plot occupies one panel, so it can be combined with other
+plots through \code{par(mfrow = ...)} or \code{\link[graphics]{layout}}.
+}
 \examples{
 \dontrun{
 mir_file <- system.file("extdata", "CL-MIR.rwl", package = "cofechar")

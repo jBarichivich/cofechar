@@ -158,12 +158,30 @@ plot_cof_coverage <- function(rwl,
   col_depth <- "#D5DCE6"
 
   # ---- layout ------------------------------------------------------------------
-  op <- graphics::par(no.readonly = TRUE)
+  # The figure occupies ONE panel of whatever the caller set up (par(mfrow),
+  # layout(), or a single plot). The series and depth panels are two plot
+  # regions stacked inside that panel with par(plt), which moves the plot
+  # region only: layout() or par(fig) would reset the caller's grid.
+  op <- graphics::par(c("plt", "xaxs", "yaxs"))
   on.exit(graphics::par(op), add = TRUE)
-  if (isTRUE(depth)) graphics::layout(matrix(1:2, 2L), heights = c(3.2, 1))
+  graphics::plot.new()                                # advance to the next panel
+  graphics::par(xaxs = "i", yaxs = "i")
   lab_in <- if (labels) max(graphics::strwidth(ids, units = "inches", cex = cex_id)) + 0.15 else 0
-  mai_l <- 0.55 + lab_in
-  graphics::par(mai = c(if (depth) 0.1 else 0.5, mai_l, 0.5, 0.25), xaxs = "i", yaxs = "i")
+  fin <- graphics::par("fin")                          # this panel, inches
+  ml <- min(0.45, (0.55 + lab_in) / fin[1L]); mr <- min(0.2, 0.25 / fin[1L])
+  mt <- min(0.25, 0.5 / fin[2L]);             mb <- min(0.25, 0.5 / fin[2L])
+  gap <- min(0.05, 0.1 / fin[2L])
+  if (isTRUE(depth)) {
+    h_dep <- (1 - mt - mb - gap) * 0.24                # depth: lower quarter
+    plt_main  <- c(ml, 1 - mr, mb + h_dep + gap, 1 - mt)
+    plt_depth <- c(ml, 1 - mr, mb, mb + h_dep)
+  } else {
+    plt_main  <- c(ml, 1 - mr, mb, 1 - mt)
+  }
+  # plot.new() again with new = TRUE: stays in this panel but resets the
+  # clipping region to the new plot region (it was fixed by the first call)
+  graphics::par(plt = plt_main, new = TRUE)
+  graphics::plot.new()
 
   if (is.null(xlab)) xlab <- switch(align,
     year  = "Year",
@@ -176,7 +194,6 @@ plot_cof_coverage <- function(rwl,
 
   pad <- 0.01 * diff(xr)
   xlim <- c(xr[1L] - pad, xr[2L] + pad)
-  graphics::plot.new()
   graphics::plot.window(xlim = xlim, ylim = c(0, n + 1))
   gx <- pretty(xlim, n = 8)
   graphics::abline(v = gx, col = col_grid, lwd = 0.5, lty = "13")
@@ -214,7 +231,9 @@ plot_cof_coverage <- function(rwl,
 
   # ---- depth panel -------------------------------------------------------------
   if (isTRUE(depth)) {
-    graphics::par(mai = c(0.5, mai_l, 0.05, 0.25))
+    # second plot region in the SAME panel: new = TRUE keeps plot.new() from
+    # advancing to the caller's next panel
+    graphics::par(plt = plt_depth, new = TRUE)
     graphics::plot.new()
     ymax <- max(dep) * 1.08
     graphics::plot.window(xlim = xlim, ylim = c(0, ymax))

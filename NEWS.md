@@ -1,5 +1,37 @@
+# cofechar 1.0.0.9018 (development)
 
-# cofechar 1.0.0.9017 (development)
+## Mixed-unit files
+
+* `dpl_read_dec(unit = "auto")` now scales each series by its own
+  terminator instead of choosing one unit for the whole file: a series ending
+  in 999 is read in 1/100 mm and one ending in -9999 in 1/1000 mm, as in the
+  Tucson convention. Before, a 1/1000 mm series in a file of 1/100 mm series
+  came back 10 times too large, and its -9999 terminator was read as a
+  missing ring, adding an empty final year. The package's own `CL-MIR.rwl`
+  read with default arguments had both problems; it is now correct without
+  naming the unit.
+* `stop_val` defaults to `c(999L, -9999L)`. A stop code is the terminator
+  only when it is the last value of its series. Elsewhere it is data, so
+  999 inside a 1/1000 mm series is a 0.999 mm ring and no longer silently
+  drops the rest of its line. -9999 inside a series is still a missing ring.
+* The unit of each series is returned in `attr(x, "units")` and printed when
+  a file mixes units. Forcing `unit = "0.01mm"` or `"0.001mm"` warns about
+  series whose terminator implies the other unit.
+
+## Multi-panel figures
+
+* `plot_cof_barplot()` and `plot_cof_coverage()` take one panel of the
+  caller's `par(mfrow)` or `layout()` figure. They used to save and restore
+  the whole `par()` state, which rewound the device to the panel they started
+  in, so the next plot overwrote them; `plot_cof_coverage()` also called
+  `layout()`, replacing the caller's grid. The coverage plot now stacks its
+  series and depth panels inside its own panel.
+* `plot_cof_barplot()` draws the sample-depth line in the bar plot's own
+  coordinates. It was drawn on a separate year axis that did not line up with
+  the bars.
+* `plot_cof_barplot()`'s default title uses a hyphen between the years: the
+  en dash it used printed as dots on `pdf()` devices.
+
 
 ## Years before the common era
 
