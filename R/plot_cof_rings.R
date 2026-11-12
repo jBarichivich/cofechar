@@ -147,6 +147,8 @@ plot_cof_rings <- function(rwl,
                            cex_id         = 0.7,
                            ...) {
 
+  .local_utf8_ctype()   # accents render as dots in a C/POSIX session
+
   xaxis <- match.arg(xaxis)
   align <- match.arg(align)
   sort  <- match.arg(sort)

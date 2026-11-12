@@ -11,19 +11,20 @@ dpl_read_dec(
   na_val = c(-999L, -9999L),
   unit = c("auto", "0.001mm", "0.01mm", "mm"),
   skip_lines = 0L,
-  base_century = 1900L
+  base_century = NULL
 )
 }
 \arguments{
 \item{file}{Character. Path to the decadal format file **or** a character
 vector of lines (for inline data or testing).}
 
-\item{label_length}{Integer or `NULL` (default). Maximum label width used
-only to disambiguate compact format (label+year concatenated) from spaced
-format (label and year as separate tokens). In spaced format, IDs shorter
-than `label_length` are accepted, so a single value covers files with
-mixed-length IDs. Supply an integer only when auto-detection fails because
-the label itself ends in four digits; leave `NULL` otherwise.}
+\item{label_length}{Integer or `NULL` (default). Width of the series ID.
+A first token longer than this is split after `label_length` characters
+and the rest is the year (compact, e.g. \code{"AMI02-446"} with 5); a first
+token no longer than this is the ID and the next token the year (spaced),
+so a single value also covers files with shorter IDs. Supply it only when
+auto-detection fails, e.g. a label that itself ends in digits or a dash
+and digits; leave `NULL` otherwise.}
 
 \item{stop_val}{Integer (default `999L`). End-of-series sentinel.
 Set `NULL` to import all values as-is.}
@@ -47,9 +48,12 @@ sentinel is the reliable marker of Holmes 1/1000 mm encoding, where
 lines to skip. \code{"auto"} skips leading lines that do not start with a
 label+year token.}
 
-\item{base_century}{Integer (default `1900L`). Century base for resolving
-century-relative year fields (e.g., \code{"0"} -> 1900, \code{"10"} -> 1910).
-Ignored for absolute 4-digit years (>= 1000).}
+\item{base_century}{Integer or `NULL` (default). `NULL` reads every year
+literally (446 is 446 CE, -446 is 446 BCE). For old files that store
+only the year within the century, give the century base: with
+\code{1900L}, \code{"0"} -> 1900 and \code{"10"} -> 1910. It is then
+applied to year tokens from 0 to 999 only; negative and 4-digit years
+are always literal.}
 }
 \value{
 A `c("rwl","data.frame")` with integer row names (calendar years),
@@ -58,14 +62,34 @@ A `c("rwl","data.frame")` with integer row names (calendar years),
   and cofechar functions.
 }
 \description{
-Reads the Tucson/DPL compact decadal format where each line contains a
-series label immediately followed by the decade year (no separator), then
-up to 10 ring-width values. Unlike \code{\link[dplR]{read.rwl}}, makes no assumption
-about label width: any label length (6, 8, 10+ characters) is handled by
-parsing the last four characters of the first token as the year.
+Reads the Tucson/DPL decadal format, where each line holds a series label,
+the year of its first value, and up to 10 ring-width values. Unlike
+\code{\link[dplR]{read.rwl}}, makes no assumption about label width: any
+label length (6, 8, 10+ characters) is handled, with the year either as a
+separate token or glued to the end of the label. Years before the common
+era are read as negative numbers.
 }
 \details{
-**Line format:** `<label><yyyy>  <v0>  <v1>  ...  <v9>`
+**Line format:** `<label> <year>  <v0>  <v1>  ...  <v9>` (spaced) or
+`<label><year>  <v0> ...` (compact, year glued to the label).
+
+\strong{Years before the common era.} Negative years are accepted in both
+layouts: \code{"AMI02   -446  ..."}, \code{"AMI02XYZ-446  ..."}, and
+\code{"AMI02-1000  ..."} where a five-character year eats into an
+eight-column label field. Years are taken as written in the file, with no
+year-zero correction: in astronomical numbering, the convention of the
+Tucson format and of most dating software, year 0 is 1 BCE and -446 is
+447 BCE. A series may run across year 0. Bar-plot pages and segments are
+laid on the same multiples of 400 and 50 years as for CE dates, so a
+series starting at -446 opens on the page -800 to -401. Text output keeps
+its column layout for years down to -999; years before that take one extra
+character.
+
+A line such as \code{"BAR-01  1930  ..."} can be read either as series
+\code{BAR-01} at 1930 or as series \code{BAR} at year -1 followed by the
+values. Such lines are resolved once per file: the reading under which
+consecutive lines continue the same series, with the year advancing by 1
+to 10, is kept. If a file is still misread, give \code{label_length}.
 
 The end-of-series marker is `999` (Tucson standard). Multiple series per
 file are supported (rows interleaved by decade). Also accepts a character

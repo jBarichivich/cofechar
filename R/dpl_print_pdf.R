@@ -84,6 +84,8 @@ dpl_print_pdf <- function(x, file,
                           family       = "Courier",
                           open         = FALSE) {
 
+  .local_utf8_ctype()   # accents render as dots in a C/POSIX session
+
   paper       <- match.arg(paper)
   orientation <- match.arg(orientation)
 
@@ -200,10 +202,11 @@ dpl_print_pdf <- function(x, file,
 
   # ---- draw --------------------------------------------------------------
   grDevices::pdf(file, width = dims[1L], height = dims[2L], family = family,
-                 title = title, paper = "special")
-  on.exit(grDevices::dev.off(), add = TRUE)
-  op <- graphics::par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i", family = family)
-  on.exit(graphics::par(op), add = TRUE)
+                 title = title, paper = "special", encoding = "WinAnsi")
+  dev_open <- TRUE                     # closed below before opening the file
+  on.exit(if (dev_open) grDevices::dev.off(), add = TRUE)
+  # par() settings belong to this device and vanish with it: nothing to restore
+  graphics::par(mar = c(0, 0, 0, 0), xaxs = "i", yaxs = "i", family = family)
   cex <- font_size / 12          # pdf() base pointsize is 12
   for (p in seq_along(pages)) {
     graphics::plot.new()
@@ -217,7 +220,7 @@ dpl_print_pdf <- function(x, file,
     y <- y0 - hdr_h - seq_along(pages[[p]]) * line_h + 0.3 * line_h
     graphics::text(rep(mar, length(y)), y, pages[[p]], adj = c(0, 0), cex = cex)
   }
-  grDevices::dev.off(); on.exit(graphics::par(op))   # close before opening the file
+  grDevices::dev.off(); dev_open <- FALSE           # close before opening the file
 
   if (isTRUE(open)) {
     if (.Platform$OS.type == "windows") shell.exec(file)

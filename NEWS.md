@@ -1,5 +1,39 @@
 
-# cofechar 1.0.0.9016 (development)
+# cofechar 1.0.0.9017 (development)
+
+## Years before the common era
+
+* `dpl_read_dec()` reads negative (BCE) years in every layout: spaced
+  (`AMI02   -446 ...`), compact with the year glued to the label
+  (`AMI02XYZ-446 ...`), and five-character years that eat into the label
+  field (`AMI02-1000 ...`). Series may run across year 0. Years are read as
+  written (astronomical numbering, as in the Tucson format). A line that could
+  be either a dashed ID or a negative year (`BAR-01  1930`) is resolved per
+  file by which reading keeps consecutive lines in the same series.
+* `label_length` now does what the error message promised: the first token is
+  split after `label_length` characters and the rest is taken as the year,
+  signed or not.
+* **Behaviour change:** `base_century` now defaults to `NULL` (years read
+  literally). The old default of 1900 silently moved every year below 1000:
+  446 CE became 2346 and -446 became 1454. Pass `base_century = 1900L` for
+  files that store only the year within the century.
+* `dpl_cof()`, `dpl_barplot()`, `plot_cof_rings()` and `plot_cof_coverage()`
+  are tested end to end on a BCE collection.
+
+## Accented text in graphics
+
+* The plotting functions (`plot_cof_rings()`, `plot_cof_coverage()`,
+  `plot_cof_barplot()`, `dpl_print_pdf()`) switch `LC_CTYPE` to UTF-8 for
+  the duration of the call when the session runs in a C/POSIX locale
+  (Rscript on a server or container, RStudio Server with `LANG` unset), where
+  every accented character was drawn as dots ("Regi..n"). The session locale
+  is restored on exit; Latin-1 and Windows sessions are left untouched.
+* `dpl_print_pdf()` writes with the WinAnsi (Windows-1252) encoding, so en
+  and em dashes, curly quotes and the euro sign print as well as Latin-1
+  accents.
+* `dpl_print_pdf()` no longer opens a stray `Rplots.pdf` device on exit, and
+  `plot_cof_barplot()` no longer discards other exit handlers when restoring
+  `par()`.
 
 ## New features
 

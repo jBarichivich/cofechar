@@ -97,6 +97,8 @@ plot_cof_coverage <- function(rwl,
                               main          = NULL,
                               cex_id        = 0.6) {
 
+  .local_utf8_ctype()   # accents render as dots in a C/POSIX session
+
   align <- match.arg(align)
   sort  <- match.arg(sort)
   if (!.is_rwl(rwl)) stop("'rwl' must be a dplR rwl data.frame.")

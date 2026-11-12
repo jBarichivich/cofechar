@@ -167,6 +167,42 @@
 #   TRUE if x is a data.frame whose row names are all coercible to integer
 #   (i.e. look like calendar years); FALSE otherwise.
 #
+# -----------------------------------------------------------------------------
+# .local_utf8_ctype  --  render accents on graphics devices in a C/POSIX session
+# -----------------------------------------------------------------------------
+#
+# In a C or POSIX locale (Rscript on a server, a container, RStudio Server
+# with LANG unset) R treats every non-ASCII byte as untranslatable, and the
+# graphics devices draw each byte of an accented character as a dot:
+# "Region" with an accent comes out as "Regi..n". This switches LC_CTYPE to a
+# UTF-8 locale for the duration of the calling function and restores it on
+# exit (registered in the caller's frame, like withr::local_*).
+#
+# It does nothing when the session is already UTF-8, when it is Latin-1, or
+# on Windows: there strings are stored in the native 8-bit encoding, and
+# reinterpreting them as UTF-8 would corrupt them instead of fixing them.
+# Returns TRUE invisibly if the locale was switched.
+.local_utf8_ctype <- function(envir = parent.frame()) {
+  li <- l10n_info()
+  if (isTRUE(li[["UTF-8"]]) || isTRUE(li[["Latin-1"]]) ||
+      .Platform$OS.type == "windows") return(invisible(FALSE))
+  old <- Sys.getlocale("LC_CTYPE")
+  for (loc in c("C.UTF-8", "C.utf8", "en_US.UTF-8", "en_US.utf8",
+                "en_GB.UTF-8", "UTF-8")) {
+    res <- suppressWarnings(Sys.setlocale("LC_CTYPE", loc))
+    if (nzchar(res) && isTRUE(l10n_info()[["UTF-8"]])) {
+      do.call(base::on.exit,
+              list(substitute(suppressWarnings(Sys.setlocale("LC_CTYPE", OLD)),
+                              list(OLD = old)), add = TRUE),
+              envir = envir)
+      return(invisible(TRUE))
+    }
+  }
+  suppressWarnings(Sys.setlocale("LC_CTYPE", old))   # none available: leave as is
+  invisible(FALSE)
+}
+
+
 .is_rwl <- function(x) {
   is.data.frame(x) &&
     !is.null(rownames(x)) &&
@@ -627,14 +663,34 @@ dpl_write <- function(x, path, format = "compact") {
 #' Read a decadal-format ring-width file with any label length
 #'
 #' @description
-#' Reads the Tucson/DPL compact decadal format where each line contains a
-#' series label immediately followed by the decade year (no separator), then
-#' up to 10 ring-width values. Unlike \code{\link[dplR]{read.rwl}}, makes no assumption
-#' about label width: any label length (6, 8, 10+ characters) is handled by
-#' parsing the last four characters of the first token as the year.
+#' Reads the Tucson/DPL decadal format, where each line holds a series label,
+#' the year of its first value, and up to 10 ring-width values. Unlike
+#' \code{\link[dplR]{read.rwl}}, makes no assumption about label width: any
+#' label length (6, 8, 10+ characters) is handled, with the year either as a
+#' separate token or glued to the end of the label. Years before the common
+#' era are read as negative numbers.
 #'
 #' @details
-#' **Line format:** `<label><yyyy>  <v0>  <v1>  ...  <v9>`
+#' **Line format:** `<label> <year>  <v0>  <v1>  ...  <v9>` (spaced) or
+#' `<label><year>  <v0> ...` (compact, year glued to the label).
+#'
+#' \strong{Years before the common era.} Negative years are accepted in both
+#' layouts: \code{"AMI02   -446  ..."}, \code{"AMI02XYZ-446  ..."}, and
+#' \code{"AMI02-1000  ..."} where a five-character year eats into an
+#' eight-column label field. Years are taken as written in the file, with no
+#' year-zero correction: in astronomical numbering, the convention of the
+#' Tucson format and of most dating software, year 0 is 1 BCE and -446 is
+#' 447 BCE. A series may run across year 0. Bar-plot pages and segments are
+#' laid on the same multiples of 400 and 50 years as for CE dates, so a
+#' series starting at -446 opens on the page -800 to -401. Text output keeps
+#' its column layout for years down to -999; years before that take one extra
+#' character.
+#'
+#' A line such as \code{"BAR-01  1930  ..."} can be read either as series
+#' \code{BAR-01} at 1930 or as series \code{BAR} at year -1 followed by the
+#' values. Such lines are resolved once per file: the reading under which
+#' consecutive lines continue the same series, with the year advancing by 1
+#' to 10, is kept. If a file is still misread, give \code{label_length}.
 #'
 #' The end-of-series marker is `999` (Tucson standard). Multiple series per
 #' file are supported (rows interleaved by decade). Also accepts a character
@@ -642,12 +698,13 @@ dpl_write <- function(x, path, format = "compact") {
 #'
 #' @param file Character. Path to the decadal format file **or** a character
 #'   vector of lines (for inline data or testing).
-#' @param label_length Integer or `NULL` (default). Maximum label width used
-#'   only to disambiguate compact format (label+year concatenated) from spaced
-#'   format (label and year as separate tokens). In spaced format, IDs shorter
-#'   than `label_length` are accepted, so a single value covers files with
-#'   mixed-length IDs. Supply an integer only when auto-detection fails because
-#'   the label itself ends in four digits; leave `NULL` otherwise.
+#' @param label_length Integer or `NULL` (default). Width of the series ID.
+#'   A first token longer than this is split after `label_length` characters
+#'   and the rest is the year (compact, e.g. \code{"AMI02-446"} with 5); a first
+#'   token no longer than this is the ID and the next token the year (spaced),
+#'   so a single value also covers files with shorter IDs. Supply it only when
+#'   auto-detection fails, e.g. a label that itself ends in digits or a dash
+#'   and digits; leave `NULL` otherwise.
 #' @param stop_val Integer (default `999L`). End-of-series sentinel.
 #'   Set `NULL` to import all values as-is.
 #' @param na_val Integer vector (default `c(-999L, -9999L)`). Values that mark
@@ -666,9 +723,12 @@ dpl_write <- function(x, path, format = "compact") {
 #' @param skip_lines Integer (default `0L`) or \code{"auto"}. Number of header
 #'   lines to skip. \code{"auto"} skips leading lines that do not start with a
 #'   label+year token.
-#' @param base_century Integer (default `1900L`). Century base for resolving
-#'   century-relative year fields (e.g., \code{"0"} -> 1900, \code{"10"} -> 1910).
-#'   Ignored for absolute 4-digit years (>= 1000).
+#' @param base_century Integer or `NULL` (default). `NULL` reads every year
+#'   literally (446 is 446 CE, -446 is 446 BCE). For old files that store
+#'   only the year within the century, give the century base: with
+#'   \code{1900L}, \code{"0"} -> 1900 and \code{"10"} -> 1910. It is then
+#'   applied to year tokens from 0 to 999 only; negative and 4-digit years
+#'   are always literal.
 #'
 #' @return A `c("rwl","data.frame")` with integer row names (calendar years),
 #'   one column per series (values in mm, `NA` for absent/missing rings).
@@ -699,7 +759,7 @@ dpl_read_dec <- function(file,
                            na_val       = c(-999L, -9999L),
                            unit         = c("auto", "0.001mm", "0.01mm", "mm"),
                            skip_lines   = 0L,
-                           base_century = 1900L) {
+                           base_century = NULL) {
 
   unit <- match.arg(unit)
 
@@ -714,13 +774,13 @@ dpl_read_dec <- function(file,
   # ---- 2. Skip header lines -------------------------------------------------
   if (identical(skip_lines, "auto") || identical(skip_lines, "AUTO")) {
     # Skip any leading line that is not a data line.
-    # A data line has either: tokens[1] ending in 4 digits (compact),
-    # or tokens[2] being a 1-4 digit year (spaced, including century-relative).
+    # A data line has either: tokens[1] ending in digits (compact, year
+    # possibly negative), or tokens[2] being a signed integer year (spaced).
     is_data <- vapply(raw_lines, function(l) {
       tok <- strsplit(trimws(l), "\\s+")[[1L]]
       if (length(tok) == 0L) return(FALSE)
-      grepl("[0-9]{1,4}$", tok[1L]) ||
-        (length(tok) >= 2L && grepl("^[0-9]{1,4}$", tok[2L]))
+      grepl("[0-9]{1,5}$", tok[1L]) ||
+        (length(tok) >= 2L && grepl("^-?[0-9]{1,5}$", tok[2L]))
     }, logical(1))
     first_data <- which(is_data)[1L]
     if (!is.na(first_data) && first_data > 1L)
@@ -736,73 +796,113 @@ dpl_read_dec <- function(file,
 
   # ---- 3. Parse lines -------------------------------------------------------
   # Handles two sub-formats transparently:
-  #   Compact: "BAR575AE1909   224   ..."  → tokens[1] = label+year concatenated
-  #   Spaced:  "BAR575AE 1909   224   ..."  → tokens[1] = label, tokens[2] = year
-  # Detection: if tokens[1] ends in 4 digits (and is long enough), it is compact;
-  # otherwise the year is in tokens[2] and values start at tokens[3].
+  #   Compact: "BAR575AE1909   224   ..."  -> tokens[1] = label+year concatenated
+  #   Spaced:  "BAR575AE 1909   224   ..." -> tokens[1] = label, tokens[2] = year
+  # Years may be negative (BCE, astronomical numbering as written in the file):
+  #   Spaced:  "AMI02   -446   123 ..."     -> year token "-446"
+  #   Compact: "AMI02XYZ-446   123 ..."     -> year "-446" glued to the label
+  #            "AMI02-1000   123 ..."       -> 5-char year eats into the label
+  #
+  # Pass 1 turns every line into a record (sid, year string, value tokens).
+  # A line whose first token ends in "-<digits>" and whose second token is
+  # also an integer is ambiguous: compact negative year ("AMI02-1000  12"),
+  # or a spaced line whose ID ends in "-<digits>" ("BAR-01  1930  12"). It is
+  # resolved once for the whole file (pass 2): the reading under which more
+  # consecutive lines continue the same series with the year advancing by
+  # 1--10 wins, since a real series runs on from one decade line to the next.
 
-  data_store <- list()
+  yr_re   <- "^-?[0-9]{1,5}$"           # a year token, signed
+  neg_re  <- "^(.*[^-])(-[0-9]{1,5})$"  # label glued to a negative year
+  recs    <- vector("list", length(raw_lines))
+  ambig   <- logical(length(raw_lines))
 
-  for (line in raw_lines) {
+  rec <- function(sid, yr_str, vals) list(sid = sid, yr = yr_str, vals = vals)
+
+  for (li in seq_along(raw_lines)) {
+    line   <- raw_lines[li]
     tokens <- strsplit(trimws(line), "\\s+")[[1L]]
     if (length(tokens) < 2L) next
-
     tag <- tokens[1L]
 
-    # Determine whether format is compact or spaced, then extract sid + decade_yr
     if (!is.null(label_length)) {
+      # Explicit label width: everything after the first `ll` characters of
+      # the first token is the year (compact); a token no longer than `ll`
+      # is an ID followed by a separate year token (spaced).
       ll <- as.integer(label_length)
-      if (nchar(tag) == ll + 4L) {
-        # Compact: "LABEL1909" — year embedded at the end of first token
-        sid       <- substr(tag, 1L, ll)
-        yr_str    <- substr(tag, ll + 1L, ll + 4L)
-        val_strs  <- tokens[-1L]
-      } else if (nchar(tag) <= ll && length(tokens) >= 2L &&
-                 grepl("^[0-9]{4}$", tokens[2L])) {
-        # Spaced: "LABEL 1909" — year is tokens[2]; ID may be shorter than ll
-        sid       <- tag
-        yr_str    <- tokens[2L]
-        val_strs  <- tokens[-(1L:2L)]
+      tail_str <- if (nchar(tag) > ll) substr(tag, ll + 1L, nchar(tag)) else ""
+      if (nchar(tag) > ll && grepl(yr_re, tail_str)) {
+        recs[[li]] <- rec(substr(tag, 1L, ll), tail_str, tokens[-1L])
+      } else if (nchar(tag) <= ll && grepl(yr_re, tokens[2L])) {
+        recs[[li]] <- rec(tag, tokens[2L], tokens[-(1L:2L)])
       } else {
         stop(sprintf(
-          paste0("Token '%s' (length %d) does not match label_length=%d: ",
-                 "expected a spaced-format ID (<= %d chars) with a 4-digit ",
-                 "year as the next token, or a compact-format token of %d chars."),
-          tag, nchar(tag), ll, ll, ll + 4L))
+          paste0("Token '%s' (length %d) does not match label_length = %d: ",
+                 "expected an ID of <= %d chars followed by a year token, or ",
+                 "an ID of exactly %d chars with the year (e.g. 1909, -446, ",
+                 "-1000) glued to it."),
+          tag, nchar(tag), ll, ll, ll))
       }
-    } else {
-      # Auto-detect: compact if last 4 chars of tokens[1] are all digits,
-      # otherwise try tokens[2] as the year (spaced format).
-      yr4 <- substr(tag, nchar(tag) - 3L, nchar(tag))
-      if (nchar(tag) >= 5L && grepl("^[0-9]{4}$", yr4)) {
-        # Compact
-        sid       <- substr(tag, 1L, nchar(tag) - 4L)
-        yr_str    <- yr4
-        val_strs  <- tokens[-1L]
-      } else if (length(tokens) >= 2L && grepl("^[0-9]{1,4}$", tokens[2L])) {
-        # Spaced: label is tokens[1], year is tokens[2] (4-digit absolute or 1-3 digit relative)
-        sid       <- tag
-        yr_str    <- tokens[2L]
-        val_strs  <- tokens[-(1L:2L)]
-      } else {
-        stop(sprintf(
-          paste0("Cannot parse year from line starting with '%s': ",
-                 "tokens[1] does not end in 4 digits and tokens[2] ('%s') ",
-                 "is not a 4-digit year. Supply label_length explicitly."),
-          tag, if (length(tokens) >= 2L) tokens[2L] else ""))
-      }
+      next
     }
 
-    if (!grepl("^-?[0-9]+$", trimws(yr_str)))
-      stop(sprintf("Parsed year string '%s' is not numeric on line: %s",
-                   yr_str, trimws(line)))
+    # Auto-detection
+    yr4 <- substr(tag, nchar(tag) - 3L, nchar(tag))
+    pre <- substr(tag, nchar(tag) - 4L, nchar(tag) - 4L)   # char before the 4 digits
+    if (nchar(tag) >= 5L && grepl("^[0-9]{4}$", yr4) && pre != "-") {
+      # Compact, positive 4-digit year
+      recs[[li]] <- rec(substr(tag, 1L, nchar(tag) - 4L), yr4, tokens[-1L])
+      next
+    }
+    can_neg    <- grepl(neg_re, tag)
+    can_spaced <- grepl(yr_re, tokens[2L])
+    if (can_neg && can_spaced) {
+      ambig[li]  <- TRUE                 # decided in pass 2
+      recs[[li]] <- list(tokens = tokens)
+    } else if (can_neg) {
+      recs[[li]] <- rec(sub(neg_re, "\\1", tag), sub(neg_re, "\\2", tag), tokens[-1L])
+    } else if (can_spaced) {
+      recs[[li]] <- rec(tag, tokens[2L], tokens[-(1L:2L)])
+    } else {
+      stop(sprintf(
+        paste0("Cannot parse year from line starting with '%s': tokens[1] ",
+               "does not end in a year and tokens[2] ('%s') is not a year. ",
+               "Supply label_length (the width of the series ID)."),
+        tag, if (length(tokens) >= 2L) tokens[2L] else ""))
+    }
+  }
 
-    yr_int <- as.integer(yr_str)
+  if (any(ambig)) {
+    tk <- lapply(recs[ambig], `[[`, "tokens")
+    as_compact <- lapply(tk, function(t)
+      rec(sub(neg_re, "\\1", t[1L]), sub(neg_re, "\\2", t[1L]), t[-1L]))
+    as_spaced  <- lapply(tk, function(t) rec(t[1L], t[2L], t[-(1L:2L)]))
+    runs_on <- function(rr) {
+      ids <- vapply(rr, `[[`, character(1), "sid")
+      yrs <- suppressWarnings(as.integer(vapply(rr, `[[`, character(1), "yr")))
+      if (length(rr) < 2L) return(0L)
+      step <- diff(yrs); same <- ids[-1L] == ids[-length(ids)]
+      sum(same & !is.na(step) & step >= 1L & step <= 10L)
+    }
+    recs[ambig] <- if (runs_on(as_compact) > runs_on(as_spaced)) as_compact else as_spaced
+  }
+  recs <- recs[!vapply(recs, is.null, logical(1))]
 
-    # Resolve century-relative years: some files store only 2-digit decade offsets
-    # (e.g., "0"=1900, "10"=1910, "80"=1980). If the year integer is < 1000,
-    # treat it as an offset from base_century (default 1900).
-    decade_yr <- if (yr_int < 1000L) as.integer(base_century) + yr_int else yr_int
+  # ---- 3b. Century-relative years (opt-in) -----------------------------------
+  # Some old files store only the decade within the century ("0" = 1900,
+  # "80" = 1980). This is applied only when base_century is given, and only
+  # to non-negative year tokens below 1000: by default every year is read
+  # literally, so 446 is 446 CE and -446 is 446 BCE.
+  yr_ints <- vapply(recs, function(r) as.integer(r$yr), integer(1))
+  if (!is.null(base_century)) {
+    rel <- yr_ints >= 0L & yr_ints < 1000L
+    yr_ints[rel] <- as.integer(base_century) + yr_ints[rel]
+  }
+
+  data_store <- list()
+  for (ri in seq_along(recs)) {
+    sid       <- recs[[ri]]$sid
+    val_strs  <- recs[[ri]]$vals
+    decade_yr <- yr_ints[ri]
     if (!(sid %in% names(data_store))) data_store[[sid]] <- numeric(0)
 
     for (i in seq_along(val_strs)) {
@@ -5021,6 +5121,7 @@ plot_cof_barplot <- function(cof_result,
                               col_neg  = "tomato",
                               main     = NULL,
                               ...) {
+  .local_utf8_ctype()
 
   if (is.null(cof_result$master))
     stop("'cof_result' must be the output of dpl_cof().")
@@ -5039,7 +5140,7 @@ plot_cof_barplot <- function(cof_result,
   if (add_sample_depth && !is.null(cof_result$sample_depth)) {
     nd  <- as.integer(cof_result$sample_depth)
     op  <- graphics::par(no.readonly = TRUE)
-    on.exit(graphics::par(op))
+    on.exit(graphics::par(op), add = TRUE)
     graphics::par(mar = c(4, 4, 3, 4))
   }
 
